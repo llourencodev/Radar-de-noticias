@@ -15,8 +15,12 @@ from .processing.legal import STAGE_LABELS
 from .processing.normalize import STOPWORDS
 
 SITE_DAYS = int(os.environ.get("RADAR_SITE_DAYS", "90"))        # janela de notícias publicadas no site
-SITE_MAX_ITEMS = int(os.environ.get("RADAR_SITE_MAX", "6000"))  # limite de notícias (sem contar duplicadas)
+SITE_MAX_ITEMS = int(os.environ.get("RADAR_SITE_MAX", "4000"))  # limite de notícias (sem contar duplicadas); ~2 KB cada no JSON
 KEEP_DAYS = int(os.environ.get("RADAR_KEEP_DAYS", "200"))       # notícias mais antigas saem do banco
+
+# o site só carrega os próprios arquivos; imagens das notícias podem vir de qualquer site https
+CSP = ("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+       "img-src 'self' https: data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'")
 
 DROP = {"canonical_url", "title_norm", "image_origin", "outlet_domain", "source_type", "group_items", "lang"}
 
@@ -77,6 +81,11 @@ def export(out_dir: Path) -> dict:
     html = html.replace('href="/static/styles.css"', 'href="styles.css"')
     html = html.replace('<script src="/static/app.js"></script>',
                         '<script src="static-api.js"></script>\n<script src="app.js"></script>')
+    html = html.replace('<meta charset="utf-8">',
+                        f'<meta charset="utf-8">\n  <meta http-equiv="Content-Security-Policy" content="{CSP}">\n'
+                        '  <meta name="referrer" content="strict-origin-when-cross-origin">', 1)
+    if "static-api.js" not in html or "Content-Security-Policy" not in html:
+        raise RuntimeError("web/index.html mudou: não foi possível adaptar a página para a versão estática")
     (out_dir / "index.html").write_text(html, encoding="utf-8")
     (out_dir / ".nojekyll").write_text("", encoding="utf-8")
 

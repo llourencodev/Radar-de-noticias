@@ -8,11 +8,8 @@ on:
     branches: [main]
     paths: ["app/**", "config/**", "web/**", "gerar_site.py", "requirements.txt", ".github/workflows/radar.yml"]
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-  actions: write                # guardar o banco entre execuções e manter o agendamento ativo
+# cada job recebe só a permissão de que precisa (o código que lê sites externos roda sem poder de escrita)
+permissions: {}
 
 concurrency:
   group: radar
@@ -22,9 +19,8 @@ jobs:
   coletar:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+    permissions:
+      contents: read
     env:
       TZ: America/Sao_Paulo
       LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'none' }}
@@ -34,6 +30,8 @@ jobs:
       LLM_MAX_PER_RUN: ${{ vars.LLM_MAX_PER_RUN || '40' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
@@ -50,28 +48,50 @@ jobs:
           key: radar-db-${{ github.run_id }}
           restore-keys: radar-db-
 
+      - name: Testes
+        run: python -m unittest discover -s tests
+
+      # se a geração falhar (ou o site sair vazio), nada é publicado e o site anterior continua no ar
       - name: Coletar e gerar o site
         run: python gerar_site.py
 
       - name: Guardar banco
-        if: always()
+        if: always() && hashFiles('data/radar.db') != ''
         uses: actions/cache/save@v4
         with:
           path: data/radar.db
           key: radar-db-${{ github.run_id }}-${{ github.run_attempt }}
 
-      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+
+  publicar:
+    needs: coletar
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
       - id: deploy
         uses: actions/deploy-pages@v4
 
-      # apaga cópias antigas do banco (fica só a mais recente) e impede que o GitHub
-      # desligue o agendamento após 60 dias sem commits
-      - name: Manutenção
-        if: always()
-        env:
+  # apaga cópias antigas do banco (fica só a mais recente) e impede que o GitHub
+  # desligue o agendamento após 60 dias sem commits. Não roda código do repositório.
+  manutencao:
+    needs: coletar
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh cache list --repo "$GITHUB_REPOSITORY" --key radar-db- --sort created_at --order desc --limit 100 --json id --jq '.[1:][].id' \

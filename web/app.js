@@ -213,6 +213,29 @@
   }
 
   // ------------------------------------------------------------ listas (abas)
+  // períodos pela data de publicação: [valor na URL, rótulo, dica]
+  const PERIODS = [
+    ["1h", "Última hora", "Publicadas nos últimos 60 minutos"],
+    ["24h", "24 horas", "Publicadas nas últimas 24 horas"],
+    ["1", "Hoje", "Publicadas hoje (desde 00:00)"],
+    ["7", "7 dias", "Publicadas nos últimos 7 dias"],
+    ["30", "30 dias", "Publicadas nos últimos 30 dias"],
+    ["90", "90 dias", "Publicadas nos últimos 90 dias"],
+    ["365", "1 ano", "Publicadas nos últimos 12 meses"],
+    ["", "Tudo", "Qualquer data"],
+    ["custom", "Intervalo…", "Escolher as datas de início e fim"],
+  ];
+  // início do período em ISO UTC sem milissegundos (mesmo formato salvo no banco)
+  function periodStart(period) {
+    const isoZ = (d) => d.toISOString().replace(/\.\d+Z$/, "Z");
+    const m = /^(\d+)h$/.exec(period || "");
+    if (m) return isoZ(new Date(Date.now() - Number(m[1]) * 3600e3));
+    const days = Number(period);
+    if (!days) return null;
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (days - 1));
+    return isoZ(d);
+  }
+
   const EXAMPLES = ["Nova Nota Técnica da NF-e", "Mudanças no IBS e CBS", "Atualização do C#", "Novo modelo da Anthropic", "Alterações no ICMS de Minas Gerais"];
 
   async function viewList(view, cat, params) {
@@ -231,14 +254,17 @@
       </div></div>
       ${isAll ? `<div class="chips">${EXAMPLES.map((e) => `<button class="chip" data-q="${esc(e)}">${esc(e)}</button>`).join("")}</div>` : ""}
       <form class="filters" id="filters">
+        <div class="periods" role="radiogroup" aria-label="Período de publicação">
+          <span class="periods-label">Período</span>
+          ${PERIODS.map(([v, label, title]) => `<label class="period ${String(f.period ?? "") === v ? "on" : ""}" title="${esc(title)}"><input type="radio" name="period" value="${esc(v)}" ${String(f.period ?? "") === v ? "checked" : ""}><span>${esc(label)}</span></label>`).join("")}
+        </div>
         ${isAll ? `<select name="category" aria-label="Categoria">${opt("", "Todas as categorias", f.category)}${S.meta.categories.map((x) => opt(x.slug, x.name, f.category)).join("")}</select>` : ""}
         <select name="source" aria-label="Fonte">${opt("", "Todas as fontes", f.source)}${outlets}</select>
-        <select name="period" aria-label="Período">${opt("", "Qualquer data", f.period)}${opt("1", "Hoje", f.period)}${opt("7", "Últimos 7 dias", f.period)}${opt("30", "Últimos 30 dias", f.period)}${opt("custom", "Intervalo…", f.period)}</select>
         <input type="date" name="from" value="${esc(f.from || "")}" aria-label="De" ${f.period === "custom" ? "" : "hidden"}>
         <input type="date" name="to" value="${esc(f.to || "")}" aria-label="Até" ${f.period === "custom" ? "" : "hidden"}>
         <select name="min_relevance" aria-label="Relevância">${opt("", "Qualquer relevância", f.min_relevance)}${opt("40", "Relevância média ou alta", f.min_relevance)}${opt("60", "Somente alta relevância", f.min_relevance)}</select>
-        ${fiscal ? `<select name="doc_type" aria-label="Tipo">${opt("", "Oficial e jornalística", f.doc_type)}${opt("oficial", "Somente publicação oficial", f.doc_type)}${opt("jornalistica", "Somente notícia jornalística", f.doc_type)}</select>
-        <select name="legal_stage" aria-label="Estágio">${opt("", "Qualquer estágio", f.legal_stage)}${Object.entries(STAGES).map(([k, v]) => opt(k, v, f.legal_stage)).join("")}</select>` : `<label class="check"><input type="checkbox" name="official" value="1" ${f.official ? "checked" : ""}> Somente oficiais</label>`}
+        <label class="check" title="Receita, gov.br, Câmara, Senado, SEFAZ, CONFAZ, Comitê Gestor e outras fontes oficiais"><input type="checkbox" name="${fiscal ? "doc_type" : "official"}" value="${fiscal ? "oficial" : "1"}" ${(fiscal ? f.doc_type === "oficial" : f.official) ? "checked" : ""}> Somente oficiais</label>
+        ${fiscal ? `<select name="legal_stage" aria-label="Estágio">${opt("", "Qualquer estágio", f.legal_stage)}${Object.entries(STAGES).map(([k, v]) => opt(k, v, f.legal_stage)).join("")}</select>` : ""}
         <span class="grow"></span>
         <select name="sort" aria-label="Ordenação">${q ? opt("auto", "Mais pertinentes à busca", f.sort || "auto") : ""}${opt("recent", "Mais recentes", f.sort)}${opt("relevance", "Mais relevantes", f.sort)}</select>
       </form>
@@ -263,8 +289,8 @@
     ["source", "min_relevance", "doc_type", "legal_stage", "sort"].forEach((k) => f[k] && apiParams.set(k, f[k]));
     if (f.official) apiParams.set("official", "true");
     if (f.period && f.period !== "custom") {
-      const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (Number(f.period) - 1));
-      apiParams.set("from", d.toISOString());
+      const start = periodStart(f.period);
+      if (start) apiParams.set("from", start);
     } else if (f.period === "custom") {
       if (f.from) apiParams.set("from", f.from);
       if (f.to) apiParams.set("to", f.to);
@@ -281,7 +307,9 @@
         fixImages(box);
       }
       offset += res.items.length;
-      $("#info").textContent = `${res.total.toLocaleString("pt-BR")} notícia(s)${q ? ` para “${q}”` : ""} · ordenadas por ${f.sort === "relevance" ? "relevância" : f.sort === "recent" || !q ? "data de publicação" : "pertinência à busca"}`;
+      const per = PERIODS.find(([v]) => v === (f.period || ""));
+      const perTxt = f.period === "custom" ? ` · de ${f.from ? f.from.split("-").reverse().join("/") : "início"} até ${f.to ? f.to.split("-").reverse().join("/") : "hoje"}` : f.period && per ? ` · ${per[2].replace(/^Publicadas /, "publicadas ")}` : "";
+      $("#info").textContent = `${res.total.toLocaleString("pt-BR")} notícia(s)${q ? ` para “${q}”` : ""}${perTxt} · ordenadas por ${f.sort === "relevance" ? "relevância" : f.sort === "recent" || !q ? "data de publicação" : "pertinência à busca"}`;
       $("#moreBtn").hidden = offset >= res.total;
     };
     $("#moreBtn").addEventListener("click", load);

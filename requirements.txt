@@ -1,7 +1,8 @@
-fastapi>=0.115
-uvicorn>=0.30
-httpx>=0.27
-feedparser>=6.0.11
-beautifulsoup4>=4.12
-tzdata>=2024.1
-truststore>=0.9
+# versões testadas (atualize com atualizar-dependencias.bat e rode os testes antes de publicar)
+fastapi==0.162.2
+uvicorn==0.54.0
+httpx==0.28.1
+feedparser==6.0.14
+beautifulsoup4==4.15.0
+tzdata==2026.6
+truststore==0.10.5
