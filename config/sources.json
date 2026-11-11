@@ -2,12 +2,17 @@
   {
     "id": "receita-noticias",
     "name": "Receita Federal",
-    "type": "rss",
-    "url": "https://www.gov.br/receitafederal/pt-br/assuntos/noticias/RSS",
+    "type": "html",
+    "url": "https://www.gov.br/receitafederal/pt-br/assuntos/noticias/{year}",
     "category": "fiscal",
     "official": true,
     "priority": 3,
-    "options": {}
+    "options": {
+      "limit": 20,
+      "filter": "keywords",
+      "link_pattern": "gov\\.br/receitafederal/pt-br/assuntos/noticias/20\\d\\d/[a-z\\-]+/[^/]+$",
+      "exclude_pattern": "\\.(png|jpe?g|gif|pdf)$"
+    }
   },
   {
     "id": "fazenda-noticias",
@@ -382,6 +387,165 @@
       "engine": "google",
       "lang": "pt",
       "days": 14,
+      "limit": 15
+    }
+  },
+  {
+    "id": "comsefaz",
+    "name": "Comsefaz (secretários de Fazenda dos estados)",
+    "type": "rss",
+    "url": "https://comsefaz.org.br/novo/feed/",
+    "category": "reforma",
+    "official": true,
+    "priority": 3,
+    "options": {
+      "filter": "keywords",
+      "max_age_days": 30
+    }
+  },
+  {
+    "id": "sefaz-es-reforma",
+    "name": "Sefaz-ES – Reforma Tributária",
+    "type": "html",
+    "url": "https://sefaz.es.gov.br/tags/reforma-tribut-ria-466nwrnf1v26z04cb1c4sgkrd4",
+    "category": "reforma",
+    "official": true,
+    "priority": 2,
+    "options": {
+      "limit": 10,
+      "max_age_days": 30,
+      "link_pattern": "sefaz\\.es\\.gov\\.br/Not[^/]*/[a-z0-9]+(-[a-z0-9]+){4,}$",
+      "exclude_pattern": "/(tags|Media)/"
+    }
+  },
+  {
+    "id": "sefin-ro-reforma",
+    "name": "Sefin-RO – Portal da Reforma Tributária",
+    "type": "html",
+    "url": "https://reformatributaria.sefin.ro.gov.br/noticias",
+    "category": "reforma",
+    "official": true,
+    "priority": 2,
+    "options": {
+      "limit": 10,
+      "max_age_days": 30,
+      "link_pattern": "reformatributaria\\.sefin\\.ro\\.gov\\.br/noticias/[a-z0-9]+(-[a-z0-9]+){2,}$"
+    }
+  },
+  {
+    "id": "sefaz-mg",
+    "name": "SEF-MG – Notícias",
+    "type": "html",
+    "url": "https://www.fazenda.mg.gov.br/noticias/{year}/",
+    "category": "fiscal",
+    "official": true,
+    "priority": 2,
+    "options": {
+      "limit": 12,
+      "filter": "keywords",
+      "max_age_days": 30,
+      "link_pattern": "fazenda\\.mg\\.gov\\.br/noticias/20\\d\\d/[^/]+/(index\\.html)?$"
+    }
+  },
+  {
+    "id": "agencia-brasil-economia",
+    "name": "Agência Brasil – Economia",
+    "type": "rss",
+    "url": "https://agenciabrasil.ebc.com.br/rss/economia/feed.xml",
+    "category": "fiscal",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "filter": "keywords"
+    }
+  },
+  {
+    "id": "busca-cgibs-site",
+    "name": "Busca: site do Comitê Gestor do IBS",
+    "type": "search",
+    "query": "site:cgibs.gov.br",
+    "category": "reforma",
+    "official": false,
+    "priority": 3,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-congresso-reforma",
+    "name": "Busca: reforma tributária na Câmara e no Senado",
+    "type": "search",
+    "query": "\"reforma tributária\" OR IBS OR CBS OR \"Imposto Seletivo\" (site:camara.leg.br OR site:senado.leg.br)",
+    "category": "reforma",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 14,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-receita-fazenda-reforma",
+    "name": "Busca: reforma tributária na Receita e na Fazenda",
+    "type": "search",
+    "query": "(\"reforma tributária\" OR CBS OR IBS OR \"Imposto Seletivo\" OR DeRE) (site:gov.br/receitafederal OR site:gov.br/fazenda)",
+    "category": "reforma",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 14,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-sefaz-sul-sudeste",
+    "name": "Busca: Sefaz Sul e Sudeste – reforma tributária",
+    "type": "search",
+    "query": "(\"reforma tributária\" OR IBS OR CBS) (site:portal.fazenda.sp.gov.br OR site:fazenda.rj.gov.br OR site:fazenda.mg.gov.br OR site:sefaz.es.gov.br OR site:estado.rs.gov.br OR site:receita.fazenda.rs.gov.br OR site:sef.sc.gov.br OR site:fazenda.pr.gov.br)",
+    "category": "reforma",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-sefaz-nordeste",
+    "name": "Busca: Sefaz Nordeste – reforma tributária",
+    "type": "search",
+    "query": "(\"reforma tributária\" OR IBS OR CBS) (site:sefaz.ba.gov.br OR site:sefaz.pe.gov.br OR site:sefaz.ce.gov.br OR site:sefaz.pb.gov.br OR site:set.rn.gov.br OR site:sefaz.al.gov.br OR site:sefaz.se.gov.br OR site:sefaz.pi.gov.br OR site:sefaz.ma.gov.br)",
+    "category": "reforma",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-sefaz-norte-co",
+    "name": "Busca: Sefaz Norte e Centro-Oeste – reforma tributária",
+    "type": "search",
+    "query": "(\"reforma tributária\" OR IBS OR CBS) (site:goias.gov.br OR site:economia.df.gov.br OR site:sefaz.mt.gov.br OR site:sefaz.ms.gov.br OR site:sefaz.am.gov.br OR site:sefa.pa.gov.br OR site:sefin.ro.gov.br OR site:sefaz.to.gov.br OR site:sefaz.ac.gov.br OR site:sefaz.ap.gov.br OR site:sefaz.rr.gov.br)",
+    "category": "reforma",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
       "limit": 15
     }
   },
