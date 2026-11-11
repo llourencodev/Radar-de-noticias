@@ -1,0 +1,79 @@
+name: Coletar notícias e publicar o site
+
+on:
+  schedule:
+    - cron: "7 * * * *"        # a cada hora (minuto 7, horário UTC)
+  workflow_dispatch: {}         # botão "Run workflow" na aba Actions
+  push:
+    branches: [main]
+    paths: ["app/**", "config/**", "web/**", "gerar_site.py", "requirements.txt", ".github/workflows/radar.yml"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: write                # guardar o banco entre execuções e manter o agendamento ativo
+
+concurrency:
+  group: radar
+  cancel-in-progress: false
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      TZ: America/Sao_Paulo
+      LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'none' }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-haiku-5-5' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      LLM_MAX_PER_RUN: ${{ vars.LLM_MAX_PER_RUN || '40' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # o banco SQLite (histórico, duplicidade, ETags) fica guardado no cache do Actions entre execuções
+      - name: Recuperar banco da última coleta
+        uses: actions/cache/restore@v4
+        with:
+          path: data/radar.db
+          key: radar-db-${{ github.run_id }}
+          restore-keys: radar-db-
+
+      - name: Coletar e gerar o site
+        run: python gerar_site.py
+
+      - name: Guardar banco
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/radar.db
+          key: radar-db-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      # apaga cópias antigas do banco (fica só a mais recente) e impede que o GitHub
+      # desligue o agendamento após 60 dias sem commits
+      - name: Manutenção
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh cache list --repo "$GITHUB_REPOSITORY" --key radar-db- --sort created_at --order desc --limit 100 --json id --jq '.[1:][].id' \
+            | xargs -r -n1 gh cache delete --repo "$GITHUB_REPOSITORY" || true
+          gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/radar.yml/enable" || true

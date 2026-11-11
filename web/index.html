@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Radar Inteligente de Notícias</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230f172a'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2338bdf8' stroke-width='2'/%3E%3Cpath d='M16 16 L26 9' stroke='%2338bdf8' stroke-width='2.5'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%2338bdf8'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="#/">
+      <svg viewBox="0 0 32 32" class="brand-mark" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".35"/><circle cx="16" cy="16" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16 L26 9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="16" cy="16" r="2.5" fill="currentColor"/></svg>
+      <span><strong>Radar</strong> Inteligente<small>de Notícias</small></span>
+    </a>
+    <nav id="nav" aria-label="Categorias"></nav>
+    <div class="sidebar-foot">
+      <a href="#/fontes" class="nav-item" data-route="fontes"><span class="ico" data-icon="radio"></span><span>Fontes e coleta</span></a>
+      <footer class="sidebar-credit"><span>Developed by</span><strong>Leandro Lourenço</strong></footer>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" id="menuBtn" aria-label="Abrir menu"><span class="ico" data-icon="menu"></span></button>
+      <form class="search" id="searchForm" role="search">
+        <span class="ico" data-icon="search"></span>
+        <input id="searchInput" type="search" placeholder="Pesquisar notícias, normas, tecnologias, fontes..." autocomplete="off" aria-label="Pesquisar">
+      </form>
+      <div class="status" id="statusBox" title="Situação da coleta">
+        <span class="dot" id="statusDot"></span>
+        <span class="status-text" id="statusText">Carregando…</span>
+      </div>
+      <button class="btn btn-primary" id="refreshBtn" title="Atualizar agora"><span class="ico" data-icon="refresh"></span><span class="hide-sm">Atualizar</span></button>
+      <button class="icon-btn" id="themeBtn" aria-label="Alternar tema claro/escuro"><span class="ico" data-icon="theme"></span></button>
+    </header>
+    <main id="view" class="view" tabindex="-1"></main>
+  </div>
+</div>
+
+<dialog id="modal" class="modal">
+  <div class="modal-body" id="modalBody"></div>
+</dialog>
+<div class="toast" id="toast" role="status"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

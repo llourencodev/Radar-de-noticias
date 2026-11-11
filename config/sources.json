@@ -1,0 +1,832 @@
+[
+  {
+    "id": "receita-noticias",
+    "name": "Receita Federal",
+    "type": "rss",
+    "url": "https://www.gov.br/receitafederal/pt-br/assuntos/noticias/RSS",
+    "category": "fiscal",
+    "official": true,
+    "priority": 3,
+    "options": {}
+  },
+  {
+    "id": "fazenda-noticias",
+    "name": "Ministério da Fazenda",
+    "type": "html",
+    "url": "https://www.gov.br/fazenda/pt-br/assuntos/noticias",
+    "category": "fiscal",
+    "official": true,
+    "priority": 2,
+    "options": {
+      "limit": 15,
+      "filter": "keywords",
+      "link_pattern": "gov\\.br/fazenda/pt-br/assuntos/noticias/20\\d\\d/[a-z\\-]+/[^/]+$"
+    }
+  },
+  {
+    "id": "portal-nfe",
+    "name": "Portal Nacional da NF-e",
+    "type": "html",
+    "url": "https://www.nfe.fazenda.gov.br/portal/principal.aspx",
+    "category": "fiscal",
+    "official": true,
+    "priority": 3,
+    "options": {
+      "limit": 10,
+      "link_pattern": "informe\\.aspx\\?ehCTG=false&Informe="
+    }
+  },
+  {
+    "id": "confaz-convenios",
+    "name": "CONFAZ – Convênios ICMS",
+    "type": "html",
+    "url": "https://www.confaz.fazenda.gov.br/legislacao/convenios/{year}",
+    "category": "fiscal",
+    "official": true,
+    "priority": 3,
+    "options": {
+      "order": "last",
+      "limit": 8,
+      "date_from_text": true,
+      "min_title": 4,
+      "link_pattern": "/legislacao/convenios/\\d{4}/cv\\d+_\\d+$",
+      "list_dates": false
+    }
+  },
+  {
+    "id": "confaz-ajustes",
+    "name": "CONFAZ – Ajustes SINIEF",
+    "type": "html",
+    "url": "https://www.confaz.fazenda.gov.br/legislacao/ajustes/{year}/{year}",
+    "category": "fiscal",
+    "official": true,
+    "priority": 3,
+    "options": {
+      "order": "last",
+      "limit": 8,
+      "date_from_text": true,
+      "min_title": 4,
+      "link_pattern": "/legislacao/ajustes/\\d{4}/aj[\\w\\-]*\\d+",
+      "list_dates": false
+    }
+  },
+  {
+    "id": "confaz-atos-cotepe",
+    "name": "CONFAZ – Atos COTEPE",
+    "type": "html",
+    "url": "https://www.confaz.fazenda.gov.br/legislacao/atos/{year}",
+    "category": "fiscal",
+    "official": true,
+    "priority": 2,
+    "options": {
+      "order": "last",
+      "limit": 8,
+      "date_from_text": true,
+      "min_title": 4,
+      "link_pattern": "/legislacao/atos/\\d{4}/ac\\d+_\\d+$",
+      "list_dates": false
+    }
+  },
+  {
+    "id": "senado-noticias",
+    "name": "Agência Senado",
+    "type": "rss",
+    "url": "https://www12.senado.leg.br/noticias/rss",
+    "category": "fiscal",
+    "official": true,
+    "priority": 2,
+    "options": {
+      "filter": "keywords"
+    }
+  },
+  {
+    "id": "camara-economia",
+    "name": "Agência Câmara – Economia",
+    "type": "rss",
+    "url": "https://www.camara.leg.br/noticias/rss/dinamico/ECONOMIA",
+    "category": "fiscal",
+    "official": true,
+    "priority": 2,
+    "options": {
+      "filter": "keywords"
+    }
+  },
+  {
+    "id": "camara-ultimas",
+    "name": "Agência Câmara – Últimas",
+    "type": "rss",
+    "url": "https://www.camara.leg.br/noticias/rss/ultimas-noticias",
+    "category": "fiscal",
+    "official": true,
+    "priority": 1,
+    "options": {
+      "filter": "keywords"
+    }
+  },
+  {
+    "id": "contabeis",
+    "name": "Portal Contábeis",
+    "type": "rss",
+    "url": "https://www.contabeis.com.br/rss/noticias/",
+    "category": "fiscal",
+    "official": false,
+    "priority": 1,
+    "options": {}
+  },
+  {
+    "id": "jota",
+    "name": "JOTA",
+    "type": "rss",
+    "url": "https://www.jota.info/feed",
+    "category": "fiscal",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "filter": "keywords"
+    }
+  },
+  {
+    "id": "busca-nt-nfe",
+    "name": "Busca: Notas Técnicas NF-e/CT-e/MDF-e",
+    "type": "search",
+    "query": "\"nota técnica\" (NF-e OR NFC-e OR CT-e OR MDF-e OR NFS-e)",
+    "category": "fiscal",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-sinief",
+    "name": "Busca: Ajustes SINIEF e Convênios ICMS",
+    "type": "search",
+    "query": "\"Ajuste SINIEF\" OR \"Convênio ICMS\" OR \"Ato COTEPE\"",
+    "category": "fiscal",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-receita-normas",
+    "name": "Busca: Receita Federal – normas",
+    "type": "search",
+    "query": "\"Receita Federal\" (\"instrução normativa\" OR portaria OR \"ato declaratório\")",
+    "category": "fiscal",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-sped",
+    "name": "Busca: SPED, EFD, ECD e ECF",
+    "type": "search",
+    "query": "SPED OR \"EFD-Reinf\" OR \"EFD ICMS IPI\" OR \"EFD Contribuições\" OR ECD OR ECF obrigação acessória",
+    "category": "fiscal",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 14,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-icms-sefaz",
+    "name": "Busca: ICMS nas SEFAZ estaduais",
+    "type": "search",
+    "query": "ICMS SEFAZ (decreto OR alíquota OR portaria OR \"substituição tributária\")",
+    "category": "fiscal",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-icms-bing",
+    "name": "Busca Bing: ICMS e tributos",
+    "type": "search",
+    "query": "ICMS SEFAZ alteração",
+    "category": "fiscal",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "bing",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-tributos-federais",
+    "name": "Busca: tributos federais",
+    "type": "search",
+    "query": "(IRPJ OR CSLL OR \"PIS/Cofins\" OR IPI OR IRPF) Receita Federal",
+    "category": "fiscal",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-dou-tributario",
+    "name": "Busca: Diário Oficial – tributário",
+    "type": "search",
+    "query": "\"Diário Oficial da União\" (tributário OR Receita Federal OR ICMS OR CONFAZ)",
+    "category": "fiscal",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-codigos-fiscais",
+    "name": "Busca: CFOP, CST, NCM e CEST",
+    "type": "search",
+    "query": "CFOP OR CSOSN OR \"tabela NCM\" OR CEST OR cClassTrib",
+    "category": "fiscal",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-reforma-oficial",
+    "name": "Busca: Reforma Tributária em gov.br",
+    "type": "search",
+    "query": "reforma tributária (IBS OR CBS) site:gov.br",
+    "category": "reforma",
+    "official": false,
+    "priority": 3,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-reforma-ibs-cbs",
+    "name": "Busca: IBS e CBS",
+    "type": "search",
+    "query": "IBS CBS reforma tributária",
+    "category": "reforma",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-reforma-bing",
+    "name": "Busca Bing: Reforma Tributária",
+    "type": "search",
+    "query": "reforma tributária IBS CBS",
+    "category": "reforma",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "bing",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-comite-gestor",
+    "name": "Busca: Comitê Gestor do IBS",
+    "type": "search",
+    "query": "\"Comitê Gestor do IBS\" OR CGIBS",
+    "category": "reforma",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-lc214",
+    "name": "Busca: LC 214/2025 e regulamentação",
+    "type": "search",
+    "query": "\"Lei Complementar 214\" OR \"LC 214\" OR \"PLP 108\" regulamentação",
+    "category": "reforma",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-imposto-seletivo",
+    "name": "Busca: Imposto Seletivo",
+    "type": "search",
+    "query": "\"Imposto Seletivo\"",
+    "category": "reforma",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 14,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-reforma-erp",
+    "name": "Busca: Reforma e sistemas/ERP",
+    "type": "search",
+    "query": "reforma tributária (ERP OR sistemas OR \"nota fiscal\" OR \"documentos fiscais\" OR \"split payment\")",
+    "category": "reforma",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 14,
+      "limit": 15
+    }
+  },
+  {
+    "id": "openai",
+    "name": "OpenAI News",
+    "type": "rss",
+    "url": "https://openai.com/news/rss.xml",
+    "category": "ia",
+    "official": true,
+    "priority": 3,
+    "options": {}
+  },
+  {
+    "id": "anthropic",
+    "name": "Anthropic News",
+    "type": "html",
+    "url": "https://www.anthropic.com/news",
+    "category": "ia",
+    "official": true,
+    "priority": 3,
+    "options": {
+      "limit": 12,
+      "link_pattern": "anthropic\\.com/(news/[\\w\\-]+|claude-[\\w\\-]+|research/[\\w\\-]+)$",
+      "exclude_pattern": "/news/(announcements|partnerships|policy|product|research|societal-impacts|economic-research|customer-stories|events)$"
+    }
+  },
+  {
+    "id": "google-ai",
+    "name": "Google – blog de IA",
+    "type": "rss",
+    "url": "https://blog.google/technology/ai/rss/",
+    "category": "ia",
+    "official": true,
+    "priority": 2,
+    "options": {}
+  },
+  {
+    "id": "techcrunch-ai",
+    "name": "TechCrunch – IA",
+    "type": "rss",
+    "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+    "category": "ia",
+    "official": false,
+    "priority": 1,
+    "options": {}
+  },
+  {
+    "id": "busca-ia-modelos",
+    "name": "Busca: novos modelos de IA",
+    "type": "search",
+    "query": "(OpenAI OR Anthropic OR Gemini OR Claude OR GPT) novo modelo",
+    "category": "ia",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-ia-bing",
+    "name": "Busca Bing: inteligência artificial",
+    "type": "search",
+    "query": "inteligência artificial lançamento",
+    "category": "ia",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "bing",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-ia-agentes",
+    "name": "Busca: agentes, RAG e MCP",
+    "type": "search",
+    "query": "\"AI agents\" OR \"Model Context Protocol\" OR RAG embeddings",
+    "category": "ia",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "bing",
+      "lang": "en",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-copilot",
+    "name": "Busca: Microsoft Copilot",
+    "type": "search",
+    "query": "\"Microsoft Copilot\" OR \"GitHub Copilot\"",
+    "category": "ia",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "bing",
+      "lang": "en",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-ia-dev",
+    "name": "Busca: IA no desenvolvimento de software",
+    "type": "search",
+    "query": "IA desenvolvimento de software programação",
+    "category": "ia",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "dotnet-blog",
+    "name": ".NET Blog",
+    "type": "rss",
+    "url": "https://devblogs.microsoft.com/dotnet/feed/",
+    "category": "programacao",
+    "official": true,
+    "priority": 3,
+    "options": {}
+  },
+  {
+    "id": "ms-devblogs",
+    "name": "Microsoft DevBlogs",
+    "type": "rss",
+    "url": "https://devblogs.microsoft.com/feed/",
+    "category": "programacao",
+    "official": true,
+    "priority": 1,
+    "options": {}
+  },
+  {
+    "id": "github-blog",
+    "name": "GitHub Blog",
+    "type": "rss",
+    "url": "https://github.blog/feed/",
+    "category": "programacao",
+    "official": true,
+    "priority": 2,
+    "options": {}
+  },
+  {
+    "id": "python-insider",
+    "name": "Python Insider",
+    "type": "rss",
+    "url": "https://blog.python.org/feeds/posts/default?alt=rss",
+    "category": "programacao",
+    "official": true,
+    "priority": 2,
+    "options": {}
+  },
+  {
+    "id": "mdn-blog",
+    "name": "MDN Blog",
+    "type": "rss",
+    "url": "https://developer.mozilla.org/en-US/blog/rss.xml",
+    "category": "programacao",
+    "official": true,
+    "priority": 1,
+    "options": {}
+  },
+  {
+    "id": "embarcadero",
+    "name": "Embarcadero (Delphi)",
+    "type": "rss",
+    "url": "https://blogs.embarcadero.com/feed/",
+    "category": "programacao",
+    "official": true,
+    "priority": 2,
+    "options": {}
+  },
+  {
+    "id": "firebird",
+    "name": "Firebird – notícias",
+    "type": "html",
+    "url": "https://firebirdsql.org/en/news/",
+    "category": "programacao",
+    "official": true,
+    "priority": 2,
+    "options": {
+      "limit": 10,
+      "link_pattern": "firebirdsql\\.org/en/news/[\\w\\-]+/?$"
+    }
+  },
+  {
+    "id": "busca-csharp",
+    "name": "Busca: C# e .NET",
+    "type": "search",
+    "query": "\"C#\" OR \".NET 10\" OR \"ASP.NET\" OR \"Visual Studio\"",
+    "category": "programacao",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "bing",
+      "lang": "en",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-delphi",
+    "name": "Busca: Delphi",
+    "type": "search",
+    "query": "Delphi Embarcadero RAD Studio",
+    "category": "programacao",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "bing",
+      "lang": "en",
+      "days": 7,
+      "limit": 10
+    }
+  },
+  {
+    "id": "busca-js-ts",
+    "name": "Busca: JavaScript, TypeScript, Angular e React",
+    "type": "search",
+    "query": "TypeScript OR Angular OR React release",
+    "category": "programacao",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "bing",
+      "lang": "en",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-sqlserver",
+    "name": "Busca: SQL Server e Firebird",
+    "type": "search",
+    "query": "\"SQL Server\" OR \"Firebird SQL\"",
+    "category": "programacao",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "bing",
+      "lang": "en",
+      "days": 7,
+      "limit": 10
+    }
+  },
+  {
+    "id": "busca-dev-pt",
+    "name": "Busca: desenvolvimento de software",
+    "type": "search",
+    "query": "desenvolvedores programação (DevOps OR \"arquitetura de software\" OR API)",
+    "category": "programacao",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "techcrunch",
+    "name": "TechCrunch",
+    "type": "rss",
+    "url": "https://techcrunch.com/feed/",
+    "category": "tecnologia",
+    "official": false,
+    "priority": 1,
+    "options": {}
+  },
+  {
+    "id": "the-verge",
+    "name": "The Verge",
+    "type": "rss",
+    "url": "https://www.theverge.com/rss/index.xml",
+    "category": "tecnologia",
+    "official": false,
+    "priority": 1,
+    "options": {}
+  },
+  {
+    "id": "canaltech",
+    "name": "Canaltech",
+    "type": "rss",
+    "url": "https://canaltech.com.br/rss/",
+    "category": "tecnologia",
+    "official": false,
+    "priority": 2,
+    "options": {}
+  },
+  {
+    "id": "tecnoblog",
+    "name": "Tecnoblog",
+    "type": "rss",
+    "url": "https://tecnoblog.net/feed/",
+    "category": "tecnologia",
+    "official": false,
+    "priority": 2,
+    "options": {}
+  },
+  {
+    "id": "google-blog",
+    "name": "Google – blog oficial",
+    "type": "rss",
+    "url": "https://blog.google/rss/",
+    "category": "tecnologia",
+    "official": true,
+    "priority": 1,
+    "options": {}
+  },
+  {
+    "id": "microsoft-blog",
+    "name": "Microsoft – blog oficial",
+    "type": "rss",
+    "url": "https://blogs.microsoft.com/feed/",
+    "category": "tecnologia",
+    "official": true,
+    "priority": 2,
+    "options": {}
+  },
+  {
+    "id": "busca-ciberseguranca",
+    "name": "Busca: cibersegurança",
+    "type": "search",
+    "query": "cibersegurança OR \"ataque hacker\" OR vulnerabilidade OR ransomware",
+    "category": "tecnologia",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-cloud",
+    "name": "Busca: cloud e infraestrutura",
+    "type": "search",
+    "query": "computação em nuvem OR Azure OR AWS OR \"data center\"",
+    "category": "tecnologia",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "bing",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "infomoney",
+    "name": "InfoMoney",
+    "type": "rss",
+    "url": "https://www.infomoney.com.br/feed/",
+    "category": "mercado",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "filter": "keywords"
+    }
+  },
+  {
+    "id": "busca-vagas-ti",
+    "name": "Busca: vagas de tecnologia",
+    "type": "search",
+    "query": "vagas tecnologia TI desenvolvedor",
+    "category": "mercado",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-salarios",
+    "name": "Busca: salários de desenvolvedores",
+    "type": "search",
+    "query": "salário desenvolvedor OR \"salários de TI\" OR \"salário programador\"",
+    "category": "mercado",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-mercado-ti",
+    "name": "Busca: mercado de trabalho em TI",
+    "type": "search",
+    "query": "\"mercado de trabalho\" tecnologia profissionais TI",
+    "category": "mercado",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "bing",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-carreira-ia",
+    "name": "Busca: profissões e IA",
+    "type": "search",
+    "query": "profissões inteligência artificial empregos",
+    "category": "mercado",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 7,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-certificacoes",
+    "name": "Busca: certificações e cursos de TI",
+    "type": "search",
+    "query": "certificação TI OR \"cursos de tecnologia\" OR bootcamp",
+    "category": "mercado",
+    "official": false,
+    "priority": 1,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  }
+]
