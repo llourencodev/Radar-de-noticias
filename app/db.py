@@ -126,10 +126,15 @@ def _migrate(c: sqlite3.Connection) -> None:
     if c.execute("PRAGMA user_version").fetchone()[0] >= erp.RULES_VERSION:
         return
     rows = c.execute(
-        """SELECT a.id, a.title, a.excerpt, an.summary FROM articles a
-           LEFT JOIN article_analysis an ON an.article_id=a.id""").fetchall()
+        """SELECT a.id, a.title, a.excerpt, an.summary, s.options FROM articles a
+           LEFT JOIN article_analysis an ON an.article_id=a.id
+           LEFT JOIN sources s ON s.id=a.source_id""").fetchall()
     for r in rows:
-        e = erp.analyze(r[1], f"{r[2] or ''} {r[3] or ''}")
+        try:
+            flag = json.loads(r[4] or "{}").get("erp_flag", True)
+        except ValueError:
+            flag = True
+        e = erp.analyze(r[1], f"{r[2] or ''} {r[3] or ''}") if flag else {"erp_impact": False, "erp_docs": [], "erp_reason": None}
         c.execute("UPDATE articles SET erp_impact=?, erp_docs=?, erp_reason=? WHERE id=?",
                   (int(e["erp_impact"]), json.dumps(e["erp_docs"], ensure_ascii=False), e["erp_reason"], r[0]))
     c.execute(f"PRAGMA user_version={int(erp.RULES_VERSION)}")

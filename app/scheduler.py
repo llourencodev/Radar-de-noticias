@@ -169,7 +169,7 @@ def process_items(source: dict, items: list[RawItem], ctx: RunContext) -> int:
             info = None
             needs_page = (not it.image_url or not it.published or len(it.excerpt) < 250 or source.get("official")
                           or source["type"] == "html")
-            if page_budget > 0 and not it.via_aggregator and needs_page:
+            if page_budget > 0 and not it.via_aggregator and needs_page and opts.get("fetch_page", True):
                 page_budget -= 1
                 info = fetch_page(it.url, allow_text_date=bool(opts.get("date_from_text")))
             art_id = build_and_store(source, it, info, ctx)
@@ -224,8 +224,12 @@ def build_and_store(source: dict, it: RawItem, info, ctx: RunContext) -> int | N
     if source["type"] == "search" and not classify.classify(title, blob_cls, None, "rss", require_title=True):
         return None  # resultado de busca sem relação clara com nenhuma aba do Radar
     keyword_only = opts.get("filter") == "keywords"
-    cats = classify.classify(title, blob_cls, None if keyword_only else source.get("category"), source["type"],
-                             require_title=keyword_only)
+    if opts.get("fixed_category") and source.get("category"):
+        # fonte dedicada a um assunto (ex.: commits do ACBr): não espalha os itens pelas outras abas
+        cats = [(source["category"], "fonte", 1.0)]
+    else:
+        cats = classify.classify(title, blob_cls, None if keyword_only else source.get("category"),
+                                 source["type"], require_title=keyword_only)
     if not cats:
         return None  # fonte generalista e assunto fora das abas do Radar
     cat_slugs = [c[0] for c in cats]
@@ -246,7 +250,8 @@ def build_and_store(source: dict, it: RawItem, info, ctx: RunContext) -> int | N
         "legal_refs": analysis_legal["legal_refs"], "legislative": analysis_legal["legislative"],
         "stage_note": analysis_legal["stage_note"], "provider": "regras",
     }
-    erp_info = erp.analyze(title, f"{excerpt} {text[:1500]}")
+    erp_info = erp.analyze(title, f"{excerpt} {text[:1500]}") if opts.get("erp_flag", True) else \
+        {"erp_impact": False, "erp_docs": [], "erp_reason": None}
     status = "link via agregador" if it.via_aggregator else ("verificada" if published else "data não confirmada")
     tnorm = norm_title(title)
     art = {

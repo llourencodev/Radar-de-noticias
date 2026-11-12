@@ -2,6 +2,7 @@
 import unittest
 from datetime import datetime, timezone
 
+from app.collectors import rss
 from app.processing import classify, dedup, erp, legal, summarize
 from app.processing.normalize import canonical_url, fts_query, norm_title, parse_any_date, parse_pt_date
 
@@ -102,6 +103,20 @@ class TestErp(unittest.TestCase):
             ("Microsoft lança nova versão do Windows", "software"),
         ]:
             self.assertFalse(erp.analyze(title, body)["erp_impact"], title)
+
+
+class TestAcbr(unittest.TestCase):
+    def test_titulo_do_commit(self):
+        t = rss.commit_title("12/11/2026 -- ACBrNFe.Classes -- [*] ACBR-10195 - Alterado o tipo da propriedade "
+                             "vUnComLiq para Double. Por: Fulano de Tal\n View Changes")
+        self.assertEqual(t, "ACBrNFe.Classes: ACBR-10195 - Alterado o tipo da propriedade vUnComLiq para Double")
+        self.assertEqual(rss.commit_title("11/11/2026 [+] Pacote de instalação do NFeABI. Por: Fulano"),
+                         "Novo: Pacote de instalação do NFeABI")
+
+    def test_categoria(self):
+        cats = classify.classify("ACBrLib: nova versão com suporte à NFS-e nacional", "", None, "rss",
+                                 require_title=True)
+        self.assertIn("acbr", [c[0] for c in cats])
 
 
 if __name__ == "__main__":

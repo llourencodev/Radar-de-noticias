@@ -12,6 +12,28 @@ NOT_ARTICLE = re.compile(r"\.(png|jpe?g|gif|webp|svg)(/view)?$", re.I)
 IMG_IN_HTML = re.compile(r"""<img[^>]+src=["']([^"']+)["']""", re.I)
 
 
+COMMIT_MARKS = {"+": "Novo: ", "-": "Removido: ", "*": "", "!": ""}
+
+
+def commit_title(text: str) -> str:
+    """Feeds de commits (ex.: SVN do ACBr) trazem só a data como título; o título vira a mensagem do commit:
+    "12/11/2026 -- ACBrNFe.Classes -- [*] Alterado o tipo... Por: Fulano" -> "ACBrNFe.Classes: Alterado o tipo..."."""
+    t = re.sub(r"\s+", " ", (text or "").replace("View Changes", " ")).strip()
+    t = re.sub(r"^(?:data:?\s*)?\d{1,2}/\d{1,2}/\d{2,4}\s*", "", t, flags=re.I)
+    t = re.sub(r"\s*\bpor:?\s+[^.]{2,80}$", "", t, flags=re.I).strip()
+    unit = ""
+    m = re.match(r"^--\s*(.+?)\s*(?:--|(?=\[[+\-*!]\]))\s*", t)
+    if m:
+        unit, t = m.group(1).strip(), t[m.end():]
+    mark = ""
+    m = re.match(r"^\[([+\-*!])\]\s*", t)
+    if m:
+        mark, t = COMMIT_MARKS.get(m.group(1), ""), t[m.end():]
+    t = t.strip(" -.;")
+    out = f"{unit}: {mark}{t}" if unit else f"{mark}{t}"
+    return out[:180].rstrip() + ("…" if len(out) > 180 else "")
+
+
 def _image_from_entry(e, base: str) -> str | None:
     for key in ("media_content", "media_thumbnail"):
         for m in e.get(key) or []:
@@ -35,7 +57,7 @@ def _image_from_entry(e, base: str) -> str | None:
     return None
 
 
-def parse_feed(content: bytes, base_url: str, default_outlet: str) -> list[RawItem]:
+def parse_feed(content: bytes, base_url: str, default_outlet: str, commits: bool = False) -> list[RawItem]:
     feed = feedparser.parse(content)
     items = []
     for e in feed.entries:
@@ -63,6 +85,10 @@ def parse_feed(content: bytes, base_url: str, default_outlet: str) -> list[RawIt
         excerpt = clean_text(e.get("summary") or body)
         if len(excerpt) < 120 and body:
             excerpt = clean_text(body)
+        if commits:
+            title = commit_title(excerpt) or title
+            if len(title) < 8:
+                continue
         img = _image_from_entry(e, link)
         src = e.get("source") or {}
         tags = [t.get("term", "") for t in e.get("tags") or [] if t.get("term")]
@@ -86,7 +112,13 @@ def fetch(source: dict) -> FetchResult:
         return FetchResult("inalterado", 304, etag=source.get("etag"), last_modified=source.get("last_modified"))
     if r.status_code >= 400:
         return FetchResult("erro", r.status_code, error=f"HTTP {r.status_code}")
-    items = parse_feed(r.content, str(r.url), source["name"])
+    commits = bool((source.get("options") or {}).get("commits"))
+    items = parse_feed(r.content, str(r.url), source["name"], commits)
+    prefix = (source.get("options") or {}).get("title_prefix")
+    if prefix:  # ex.: "ACBr" — deixa claro o assunto quando a mensagem do commit não cita o projeto
+        for it in items:
+            if prefix.lower() not in it.title.lower():
+                it.title = f"{prefix}: {it.title}"
     if not items and b"<rss" not in r.content[:2000] and b"<feed" not in r.content[:2000]:
         return FetchResult("erro", r.status_code, error="Resposta não é um feed RSS/Atom válido")
     return FetchResult("ok", r.status_code, items, r.headers.get("etag"), r.headers.get("last-modified"))
