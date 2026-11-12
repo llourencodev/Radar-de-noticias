@@ -112,6 +112,8 @@ def init_db() -> None:
         c.executescript(SCHEMA)
         _migrate(c)
     seed_config()
+    with WRITE_LOCK, session() as c:
+        _fix_commit_excerpts(c)
 
 
 def _migrate(c: sqlite3.Connection) -> None:
@@ -168,6 +170,24 @@ def seed_config() -> None:
                  int(s.get("enabled", True)), json.dumps(s.get("options", {}), ensure_ascii=False),
                  s.get("notes")),
             )
+
+
+def _fix_commit_excerpts(c: sqlite3.Connection) -> None:
+    """Itens de feeds de commits salvos antes do resumo curto repetiam a mensagem do título no card."""
+    from .collectors.rss import commit_excerpt
+    srcs = [r[0] for r in c.execute("SELECT id, options FROM sources")
+            if '"commits": true' in (r[1] or "")]
+    if not srcs:
+        return
+    marks = ",".join("?" * len(srcs))
+    rows = c.execute(
+        f"""SELECT id, url, excerpt FROM articles WHERE source_id IN ({marks})
+            AND excerpt NOT LIKE 'Revisão %' AND excerpt NOT LIKE 'Alteração no repositório%'""", srcs).fetchall()
+    for aid, url, excerpt in rows:
+        new = commit_excerpt(excerpt or "", url)
+        c.execute("UPDATE articles SET excerpt=? WHERE id=?", (new, aid))
+        c.execute("UPDATE article_analysis SET summary=?, key_points='[]' WHERE article_id=?", (new, aid))
+        c.execute("UPDATE articles_fts SET excerpt=?, summary=? WHERE rowid=?", (new, new, aid))
 
 
 # ---------------------------------------------------------------- fontes
