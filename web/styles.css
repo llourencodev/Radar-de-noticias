@@ -140,6 +140,11 @@ button, input, select { font: inherit; color: inherit; }
 .noimg .ico { width: 30px; height: 30px; opacity: .9; }
 .noimg .outlet { font-weight: 700; font-size: 15px; color: var(--text); }
 .noimg .note { font-size: 11.5px; color: var(--text-3); }
+.noimg.logo-ph { align-items: center; justify-content: center; background: linear-gradient(135deg, #1f2937 0%, #0f172a 100%); }
+.noimg.logo-ph .brand-logo { width: 30%; max-width: 96px; height: auto; }
+.noimg.logo-ph .outlet { color: #e2e8f0; font-size: 13px; font-weight: 600; text-align: center; }
+.list-item .mini .noimg.logo-ph .brand-logo { width: 70%; }
+.ico img.logo { width: 100%; height: 100%; object-fit: contain; }
 .card-body { padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .badges { display: flex; flex-wrap: wrap; gap: 6px; }
 .badge {

@@ -1,6 +1,7 @@
 """Ciclo de coleta: decide quais fontes estão vencidas, coleta em paralelo, processa e grava histórico."""
 import json
 import logging
+import re
 import threading
 import time
 import traceback
@@ -209,6 +210,12 @@ def build_and_store(source: dict, it: RawItem, info, ctx: RunContext) -> int | N
         if len(info.text) > len(text):
             text = info.text
         section = info.section
+    # trecho que só repete o título ou é apenas um endereço (comum no Google Notícias) não acrescenta nada
+    bare = re.sub(r"https?://\S+", " ", excerpt).strip()
+    if len(bare) < 15 or norm_title(bare).startswith(norm_title(title)[:80]):
+        if text == excerpt:
+            text = ""
+        excerpt = ""
     published = sanity_check_date(published)
     opts = source.get("options") or {}
     cutoff = db.now_utc() - timedelta(days=int(opts.get("max_age_days", _max_age(source))))

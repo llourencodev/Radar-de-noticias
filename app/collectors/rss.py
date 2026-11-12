@@ -34,6 +34,15 @@ def commit_title(text: str) -> str:
     return out[:180].rstrip() + ("…" if len(out) > 180 else "")
 
 
+def commit_excerpt(text: str, link: str, author: str | None = None) -> str:
+    """Resumo curto do commit (revisão e autor), para o card não repetir a mensagem que já é o título."""
+    m = re.search(r"\bpor:?\s+([^.\n]{2,80}?)\s*(?:View Changes|$)", text or "", re.I)
+    who = (m.group(1).strip() if m else None) or author
+    rev = re.search(r"/(\d+)/?$", link or "")
+    out = f"Revisão {rev.group(1)} do repositório SVN" if rev else "Alteração no repositório SVN"
+    return out + (f", por {who}." if who else ".")
+
+
 def _image_from_entry(e, base: str) -> str | None:
     for key in ("media_content", "media_thumbnail"):
         for m in e.get(key) or []:
@@ -89,6 +98,7 @@ def parse_feed(content: bytes, base_url: str, default_outlet: str, commits: bool
             title = commit_title(excerpt) or title
             if len(title) < 8:
                 continue
+            excerpt = commit_excerpt(excerpt, link, e.get("author"))
         img = _image_from_entry(e, link)
         src = e.get("source") or {}
         tags = [t.get("term", "") for t in e.get("tags") or [] if t.get("term")]
