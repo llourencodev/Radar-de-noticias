@@ -109,6 +109,7 @@ tests/                   testes: .venv\Scripts\python.exe -m unittest discover t
 - A data de publicação e a data de coleta ficam em campos separados. Sem data confirmada, aparece “Data não confirmada”.
 - Itens sem título, sem link ou sem fonte identificável são descartados.
 - Na área fiscal, cada item é marcado como publicação oficial ou notícia jornalística e recebe um estágio. Na dúvida, o estágio escolhido é o menos avançado. “Norma em vigor” só é atribuído com base em fonte oficial.
+- **ACBr**: aba própria com as alterações publicadas no SVN oficial do Projeto ACBr (a mensagem de cada commit vira o título, ex.: “ACBrNFe.Classes: …”) e notícias que citam o ACBr, ACBrLib, ACBrMonitor e demais componentes. Os commits ficam só nessa aba, para não lotar as abas fiscais.
 - **Notas técnicas / ERP**: notícias que exigem ajuste ou implementação em sistemas (notas técnicas de NF-e, NFC-e, NFS-e, CT-e, MDF-e; leiautes, schemas e regras de validação; Ajustes SINIEF e Atos COTEPE; guias e PVAs do SPED/EFD; IBS/CBS e cClassTrib nos documentos fiscais) recebem o selo “Ajuste em ERP” com os documentos afetados. Ficam reunidas na aba *Notas técnicas / ERP* (com filtro por documento) e podem ser filtradas em qualquer aba pela opção “Exige ajuste em ERP”. As regras estão em `app/processing/erp.py`; ao mudá-las, aumente `RULES_VERSION` para que as notícias já salvas sejam reavaliadas.
 - Resumos, pontos e impactos são identificados como interpretação automática; colunas de opinião são sinalizadas.
 - Uma fonte com falha não interrompe as outras.

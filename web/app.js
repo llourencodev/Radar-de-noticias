@@ -20,6 +20,7 @@
     menu: P('<path d="M4 6h16M4 12h16M4 18h16"/>'),
     external: P('<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>'),
     close: P('<path d="M6 6l12 12M18 6L6 18"/>'),
+    box: P('<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/>'),
     wrench: P('<path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.4-.4-2.4z"/>'),
   };
   const icon = (n) => `<span class="ico">${ICONS[n] || ""}</span>`;

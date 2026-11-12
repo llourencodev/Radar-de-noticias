@@ -1037,5 +1037,53 @@
       "days": 30,
       "limit": 15
     }
+  },
+  {
+    "id": "acbr-svn",
+    "name": "ACBr – SVN (alterações nos componentes)",
+    "type": "rss",
+    "url": "https://sourceforge.net/p/acbr/code/feed",
+    "category": "acbr",
+    "official": true,
+    "priority": 2,
+    "options": {
+      "commits": true,
+      "title_prefix": "ACBr",
+      "fixed_category": true,
+      "erp_flag": false,
+      "fetch_page": false,
+      "max_age_days": 30
+    },
+    "notes": "Mensagens dos commits do repositório oficial do Projeto ACBr no SourceForge."
+  },
+  {
+    "id": "busca-acbr",
+    "name": "Busca: Projeto ACBr",
+    "type": "search",
+    "query": "ACBr OR \"Projeto ACBr\" OR ACBrLib OR ACBrMonitor",
+    "category": "acbr",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-acbr-forum",
+    "name": "Busca: Fórum e blog do Projeto ACBr",
+    "type": "search",
+    "query": "site:projetoacbr.com.br",
+    "category": "acbr",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
   }
 ]
