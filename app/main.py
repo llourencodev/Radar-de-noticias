@@ -37,9 +37,10 @@ def articles(q: str = "", category: str | None = None, source: str | None = None
              date_from: str | None = Query(None, alias="from"), date_to: str | None = Query(None, alias="to"),
              min_relevance: float | None = None, official: bool | None = None, doc_type: str | None = None,
              legal_stage: str | None = None, sort: str = "auto", limit: int = Query(30, le=100),
-             offset: int = 0, include_duplicates: bool = False):
+             offset: int = 0, include_duplicates: bool = False, erp: bool | None = None,
+             erp_doc: str | None = None):
     return db.search_articles(q, category, source, date_from, date_to, min_relevance, official, doc_type,
-                              legal_stage, sort, limit, offset, include_duplicates)
+                              legal_stage, sort, limit, offset, include_duplicates, erp, erp_doc)
 
 
 @app.get("/api/articles/{aid}")

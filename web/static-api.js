@@ -125,6 +125,8 @@
     if (p.official != null && p.official !== "") { const o = p.official === true || p.official === "true" ? 1 : 0; pool = pool.filter((a) => Number(a.official) === o); }
     if (p.doc_type) pool = pool.filter((a) => a.doc_type === p.doc_type);
     if (p.legal_stage) pool = pool.filter((a) => a.legal_stage === p.legal_stage);
+    if (p.erp != null && p.erp !== "") { const e = p.erp === true || p.erp === "true" || p.erp === "1" ? 1 : 0; pool = pool.filter((a) => Number(a.erp_impact || 0) === e); }
+    if (p.erp_doc) pool = pool.filter((a) => (a.erp_docs || []).includes(p.erp_doc));
     const sort = p.sort || "auto";
     let items;
     if (q) {
@@ -160,6 +162,8 @@
       sources_failing: D.meta.sources_failing,
       top: search({ from: ago(3), sort: "relevance", limit: 6 }).items,
       official: search({ official: true, from: ago(7), sort: "recent", limit: 6 }).items,
+      erp: search({ erp: true, sort: "recent", limit: 6 }).items,
+      erp_total: D.list.filter((a) => a.erp_impact).length,
       fiscal: search({ cats: ["fiscal", "reforma"], limit: 6 }).items,
       ia: search({ category: "ia", limit: 6 }).items,
       programacao: search({ category: "programacao", limit: 6 }).items,

@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS articles (
   doc_type TEXT, legal_stage TEXT, nature TEXT,
   validation_status TEXT, via_aggregator INTEGER DEFAULT 0,
   group_id INTEGER REFERENCES article_groups(id), is_duplicate INTEGER DEFAULT 0,
-  is_update INTEGER DEFAULT 0
+  is_update INTEGER DEFAULT 0,
+  erp_impact INTEGER DEFAULT 0, erp_docs TEXT DEFAULT '[]', erp_reason TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_articles_pub ON articles(published_at DESC);
 CREATE INDEX IF NOT EXISTS ix_articles_cat ON articles(primary_category);
@@ -109,7 +110,29 @@ def session():
 def init_db() -> None:
     with WRITE_LOCK, session() as c:
         c.executescript(SCHEMA)
+        _migrate(c)
     seed_config()
+
+
+def _migrate(c: sqlite3.Connection) -> None:
+    """Bancos criados antes da marcação "Notas técnicas / ERP" ganham as colunas novas, e as notícias
+    já salvas são reavaliadas sempre que as regras mudam (versão guardada em PRAGMA user_version)."""
+    from .processing import erp
+    cols = {r[1] for r in c.execute("PRAGMA table_info(articles)")}
+    for col, ddl in (("erp_impact", "INTEGER DEFAULT 0"), ("erp_docs", "TEXT DEFAULT '[]'"), ("erp_reason", "TEXT")):
+        if col not in cols:
+            c.execute(f"ALTER TABLE articles ADD COLUMN {col} {ddl}")
+    c.execute("CREATE INDEX IF NOT EXISTS ix_articles_erp ON articles(erp_impact)")
+    if c.execute("PRAGMA user_version").fetchone()[0] >= erp.RULES_VERSION:
+        return
+    rows = c.execute(
+        """SELECT a.id, a.title, a.excerpt, an.summary FROM articles a
+           LEFT JOIN article_analysis an ON an.article_id=a.id""").fetchall()
+    for r in rows:
+        e = erp.analyze(r[1], f"{r[2] or ''} {r[3] or ''}")
+        c.execute("UPDATE articles SET erp_impact=?, erp_docs=?, erp_reason=? WHERE id=?",
+                  (int(e["erp_impact"]), json.dumps(e["erp_docs"], ensure_ascii=False), e["erp_reason"], r[0]))
+    c.execute(f"PRAGMA user_version={int(erp.RULES_VERSION)}")
 
 
 def seed_config() -> None:
@@ -215,7 +238,7 @@ def insert_article(c: sqlite3.Connection, art: dict, analysis: dict, categories:
         "image_url", "image_origin", "published_at", "date_precision", "date_confirmed",
         "collected_at", "excerpt", "lang", "primary_category", "relevance", "official", "doc_type",
         "legal_stage", "nature", "validation_status", "via_aggregator", "group_id", "is_duplicate",
-        "is_update",
+        "is_update", "erp_impact", "erp_docs", "erp_reason",
     ]
     cur = c.execute(
         f"INSERT INTO articles({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
@@ -265,7 +288,7 @@ LEFT JOIN article_groups g ON g.id = a.group_id
 
 def _row_to_article(r: sqlite3.Row) -> dict:
     d = dict(r)
-    for k in ("key_points", "impacts", "terms", "legal_refs"):
+    for k in ("key_points", "impacts", "terms", "legal_refs", "erp_docs"):
         try:
             d[k] = json.loads(d.get(k) or "[]")
         except ValueError:
@@ -280,7 +303,8 @@ def search_articles(q: str = "", category: str | None = None, source: str | None
                     min_relevance: float | None = None, official: bool | None = None,
                     doc_type: str | None = None, legal_stage: str | None = None,
                     sort: str = "auto", limit: int = 30, offset: int = 0,
-                    include_duplicates: bool = False) -> dict:
+                    include_duplicates: bool = False, erp: bool | None = None,
+                    erp_doc: str | None = None) -> dict:
     where, params = ["1=1"], []
     if not include_duplicates:
         where.append("a.is_duplicate=0")
@@ -308,6 +332,12 @@ def search_articles(q: str = "", category: str | None = None, source: str | None
     if legal_stage:
         where.append("a.legal_stage=?")
         params.append(legal_stage)
+    if erp is not None:
+        where.append("a.erp_impact=?")
+        params.append(int(erp))
+    if erp_doc:
+        where.append("a.erp_docs LIKE ?")
+        params.append('%' + json.dumps(erp_doc, ensure_ascii=False) + '%')
 
     order = "a.published_at IS NULL, a.published_at DESC, a.id DESC"
     if sort == "relevance" and not q.strip():
@@ -417,6 +447,8 @@ def dashboard() -> dict:
         "sources_failing": sources_failing,
         "top": search_articles(date_from=since, sort="relevance", limit=6)["items"],
         "official": search_articles(official=True, date_from=week, sort="recent", limit=6)["items"],
+        "erp": search_articles(erp=True, sort="recent", limit=6)["items"],
+        "erp_total": search_articles(erp=True, limit=1)["total"],
         "fiscal": _latest_multi(["fiscal", "reforma"], 6),
         "ia": search_articles(category="ia", limit=6)["items"],
         "programacao": search_articles(category="programacao", limit=6)["items"],

@@ -181,6 +181,51 @@
     }
   },
   {
+    "id": "busca-leiautes-dfe",
+    "name": "Busca: Leiautes e regras de validação (DF-e/SPED)",
+    "type": "search",
+    "query": "(leiaute OR \"schema XML\" OR \"regras de validação\" OR \"pacote de liberação\" OR \"guia prático\") (NF-e OR NFC-e OR CT-e OR MDF-e OR NFS-e OR EFD OR SPED OR Reinf)",
+    "category": "fiscal",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-ibs-cbs-dfe",
+    "name": "Busca: IBS/CBS nos documentos fiscais",
+    "type": "search",
+    "query": "(IBS OR CBS) (\"nota técnica\" OR leiaute OR cClassTrib OR \"documentos fiscais\" OR \"NF-e\" OR ERP)",
+    "category": "reforma",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
+    "id": "busca-nfse-nacional",
+    "name": "Busca: NFS-e padrão nacional",
+    "type": "search",
+    "query": "\"NFS-e\" (\"padrão nacional\" OR \"emissor nacional\" OR \"nota técnica\" OR leiaute OR obrigatoriedade)",
+    "category": "fiscal",
+    "official": false,
+    "priority": 2,
+    "options": {
+      "engine": "google",
+      "lang": "pt",
+      "days": 30,
+      "limit": 15
+    }
+  },
+  {
     "id": "busca-receita-normas",
     "name": "Busca: Receita Federal – normas",
     "type": "search",

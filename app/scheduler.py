@@ -1,4 +1,5 @@
 """Ciclo de coleta: decide quais fontes estão vencidas, coleta em paralelo, processa e grava histórico."""
+import json
 import logging
 import threading
 import time
@@ -10,7 +11,7 @@ from . import config, db
 from .collectors import html as html_collector
 from .collectors import rss, search
 from .collectors.base import FetchResult, RawItem
-from .processing import classify, dedup, legal, llm, summarize
+from .processing import classify, dedup, erp, legal, llm, summarize
 from .processing.normalize import canonical_url, clean_text, detect_lang, domain_of, norm_title, sanity_check_date
 from .processing.page import fetch_page
 
@@ -245,6 +246,7 @@ def build_and_store(source: dict, it: RawItem, info, ctx: RunContext) -> int | N
         "legal_refs": analysis_legal["legal_refs"], "legislative": analysis_legal["legislative"],
         "stage_note": analysis_legal["stage_note"], "provider": "regras",
     }
+    erp_info = erp.analyze(title, f"{excerpt} {text[:1500]}")
     status = "link via agregador" if it.via_aggregator else ("verificada" if published else "data não confirmada")
     tnorm = norm_title(title)
     art = {
@@ -259,6 +261,8 @@ def build_and_store(source: dict, it: RawItem, info, ctx: RunContext) -> int | N
         "legal_stage": analysis_legal["legal_stage"],
         "nature": classify.nature(it.url, it.tags, section), "validation_status": status,
         "via_aggregator": int(it.via_aggregator),
+        "erp_impact": int(erp_info["erp_impact"]), "erp_docs": json.dumps(erp_info["erp_docs"], ensure_ascii=False),
+        "erp_reason": erp_info["erp_reason"],
     }
 
     with ctx.lock, db.WRITE_LOCK, db.session() as c:

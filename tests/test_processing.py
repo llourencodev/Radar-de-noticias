@@ -2,7 +2,7 @@
 import unittest
 from datetime import datetime, timezone
 
-from app.processing import classify, dedup, legal, summarize
+from app.processing import classify, dedup, erp, legal, summarize
 from app.processing.normalize import canonical_url, fts_query, norm_title, parse_any_date, parse_pt_date
 
 
@@ -79,6 +79,29 @@ class TestResumo(unittest.TestCase):
             self.assertIn(frase.strip(". "), text)
         self.assertTrue(summarize.find_terms("EFD-Reinf e SPED"))
         self.assertTrue(summarize.impacts("nova nota técnica altera leiaute da NF-e", ["fiscal"]))
+
+
+class TestErp(unittest.TestCase):
+    def test_marca_mudancas_que_exigem_ajuste_no_erp(self):
+        for title, body in [
+            ("Publicada a NT 2025.002 v1.30 da NF-e", ""),
+            ("Ajuste SINIEF 49/25", ""),
+            ("CT-e: SEFAZ publica novo leiaute do evento de comprovante de entrega", ""),
+            ("EFD-Reinf: nova versão do leiaute entra em produção", ""),
+            ("Empresas precisam adequar o ERP para IBS e CBS na nota fiscal", ""),
+            ("Reforma tributária: o que muda para o varejo", "Empresas devem ajustar o ERP para destacar IBS e CBS na NF-e."),
+        ]:
+            self.assertTrue(erp.analyze(title, body)["erp_impact"], title)
+        self.assertIn("NF-e", erp.analyze("Publicada a NT 2025.002 v1.30 da NF-e")["erp_docs"])
+
+    def test_nao_marca_noticias_sem_mudanca_tecnica(self):
+        for title, body in [
+            ("Receita Federal divulga arrecadação de outubro", "Os sistemas da Receita registraram nova alta."),
+            ("Nota Fiscal Paulista sorteia prêmios", ""),
+            ("Senado aprova PLP 108 da reforma tributária", "IBS, CBS e Comitê Gestor."),
+            ("Microsoft lança nova versão do Windows", "software"),
+        ]:
+            self.assertFalse(erp.analyze(title, body)["erp_impact"], title)
 
 
 if __name__ == "__main__":
