@@ -44,6 +44,9 @@ def _articles() -> list[dict]:
         for k in DROP:
             d.pop(k, None)
         d["excerpt"] = (d.get("excerpt") or "")[:400]
+        if not d.get("erp_impact"):  # só as marcadas levam os detalhes (deixa o JSON menor)
+            for k in ("erp_impact", "erp_docs", "erp_reason"):
+                d.pop(k, None)
         out.append(d)
     return out
 

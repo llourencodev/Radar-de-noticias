@@ -20,6 +20,7 @@
     menu: P('<path d="M4 6h16M4 12h16M4 18h16"/>'),
     external: P('<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>'),
     close: P('<path d="M6 6l12 12M18 6L6 18"/>'),
+    wrench: P('<path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.4-.4-2.4z"/>'),
   };
   const icon = (n) => `<span class="ico">${ICONS[n] || ""}</span>`;
   const hydrateIcons = (root = document) => root.querySelectorAll("[data-icon]").forEach((el) => { el.innerHTML = ICONS[el.dataset.icon] || ""; });
@@ -74,6 +75,11 @@
     norma_aprovada: "Norma aprovada", norma_publicada: "Norma publicada", norma_em_vigor: "Norma em vigor",
   };
 
+  // marcação "Notas técnicas / ERP" (mudanças que exigem ajuste em sistemas)
+  const ERP = { name: "Notas técnicas e ajustes em ERP", short: "Notas técnicas / ERP", color: "#c2410c" };
+  const ERP_DOCS = ["NF-e", "NFC-e", "NFS-e", "CT-e", "MDF-e", "NF3e/NFCom", "BP-e/GNRE", "SPED/EFD", "EFD-Reinf", "eSocial", "DCTFWeb", "IBS/CBS", "Documentos fiscais"];
+  const erpBadge = (a) => (a.erp_impact ? `<span class="badge erp" title="${esc(a.erp_reason || "Pode exigir ajuste em sistemas")} — classificação automática">Ajuste em ERP${(a.erp_docs || []).length ? ` · ${esc(a.erp_docs.join(", "))}` : ""}</span>` : "");
+
   // ------------------------------------------------------------ componentes
   function catOf(slug) { return S.cats[slug] || { name: slug, color: "#64748b", icon: "layers" }; }
 
@@ -92,6 +98,7 @@
       const c = catOf(slug);
       out.push(`<span class="badge cat" style="--c:${c.color}">${esc(c.name)}</span>`);
     });
+    if (a.erp_impact) out.push(erpBadge(a));
     if (a.doc_type === "oficial" || (a.official && !a.doc_type)) out.push(`<span class="badge official" title="Publicado por órgão oficial ou pelo próprio fabricante">Publicação oficial</span>`);
     else if (a.doc_type === "jornalistica") out.push(`<span class="badge journal">Notícia jornalística</span>`);
     if (a.legal_stage) out.push(`<span class="badge stage ${esc(a.legal_stage)}" title="Classificação automática do estágio da norma">${esc(STAGES[a.legal_stage] || a.legal_stage)}</span>`);
@@ -150,6 +157,8 @@
     S.meta.categories.forEach((c) => {
       items.push(`<a class="nav-item" href="#/c/${c.slug}" data-route="c/${c.slug}" style="--c:${c.color}">${icon(c.icon)}<span>${esc(c.name)}</span><span class="count">${counts[c.slug] ?? ""}</span></a>`);
     });
+    items.push(`<div class="nav-label">Destaques</div>`);
+    items.push(`<a class="nav-item" href="#/erp" data-route="erp" style="--c:${ERP.color}">${icon("wrench")}<span>${ERP.short}</span><span class="count">${S.dash && S.dash.erp_total != null ? S.dash.erp_total : ""}</span></a>`);
     items.push(`<a class="nav-item" href="#/todas" data-route="todas">${icon("layers")}<span>Todas as notícias</span><span class="count">${S.dash ? S.dash.total : ""}</span></a>`);
     $("#nav").innerHTML = items.join("");
     markActive();
@@ -173,6 +182,7 @@
       if (path === "dashboard") await viewDashboard(view);
       else if (path.startsWith("c/")) await viewList(view, path.slice(2), params);
       else if (path === "todas") await viewList(view, "todas", params);
+      else if (path === "erp") await viewList(view, "erp", params);
       else if (path === "fontes") await viewSources(view);
       else await viewDashboard(view);
     } catch (e) {
@@ -204,6 +214,7 @@
       </div>
       ${section("Mais relevantes", d.top, "#/todas?sort=relevance", "lead")}
       ${section("Oficiais em destaque", d.official, "#/todas?official=1")}
+      ${d.erp ? section("Notas técnicas e ajustes em ERP", d.erp, "#/erp") : ""}
       <div class="cols">
         <div>${section("Últimas fiscais", d.fiscal, "#/c/fiscal", "list")}</div>
         <div>${section("Novidades de IA", d.ia, "#/c/ia", "list")}</div>
@@ -239,20 +250,23 @@
   const EXAMPLES = ["Nova Nota Técnica da NF-e", "Mudanças no IBS e CBS", "Atualização do C#", "Novo modelo da Anthropic", "Alterações no ICMS de Minas Gerais"];
 
   async function viewList(view, cat, params) {
-    const isAll = cat === "todas";
-    const c = isAll ? { name: "Todas as notícias", color: "#0b5cad" } : catOf(cat);
-    const fiscal = cat === "fiscal" || cat === "reforma";
+    const isErp = cat === "erp";
+    const isAll = cat === "todas" || isErp;
+    const base = cat === "todas" ? "todas" : isErp ? "erp" : "c/" + cat;
+    const c = isErp ? ERP : isAll ? { name: "Todas as notícias", color: "#0b5cad" } : catOf(cat);
+    const fiscal = cat === "fiscal" || cat === "reforma" || isErp;
     const f = Object.fromEntries(params.entries());
     const q = f.q || "";
     $("#searchInput").value = q;
     const opt = (v, label, cur) => `<option value="${esc(v)}" ${String(cur ?? "") === String(v) ? "selected" : ""}>${esc(label)}</option>`;
     const outlets = S.meta.outlets.map((o) => opt(o.outlet, `${o.outlet} (${o.n})`, f.source)).join("");
     view.innerHTML = `
-      <div class="page-head"><div><div class="eyebrow" style="color:${c.color}">${isAll ? "Visão geral" : "Categoria"}</div><h1>${esc(c.name)}</h1>
+      <div class="page-head"><div><div class="eyebrow" style="color:${c.color}">${isErp ? "Impacto em sistemas" : isAll ? "Visão geral" : "Categoria"}</div><h1>${esc(c.name)}</h1>
       ${cat === "reforma" ? "<p>Publicações oficiais têm prioridade. O estágio de cada norma é classificado de forma conservadora: uma proposta nunca aparece como norma vigente.</p>" : ""}
+      ${isErp ? "<p>Notas técnicas, leiautes, schemas, regras de validação, Ajustes SINIEF/Atos COTEPE e mudanças (inclusive IBS/CBS) que exigem ajuste ou implementação em ERPs e emissores de documentos fiscais. Classificação automática: confirme sempre na publicação oficial.</p>" : ""}
       ${cat === "fiscal" ? "<p>Separação entre publicação oficial e notícia jornalística, e estágio de cada norma (projeto, consulta, aprovada, publicada, em vigor).</p>" : ""}
       </div></div>
-      ${isAll ? `<div class="chips">${EXAMPLES.map((e) => `<button class="chip" data-q="${esc(e)}">${esc(e)}</button>`).join("")}</div>` : ""}
+      ${cat === "todas" ? `<div class="chips">${EXAMPLES.map((e) => `<button class="chip" data-q="${esc(e)}">${esc(e)}</button>`).join("")}</div>` : ""}
       <form class="filters" id="filters">
         <div class="periods" role="radiogroup" aria-label="Período de publicação">
           <span class="periods-label">Período</span>
@@ -265,6 +279,8 @@
         <select name="min_relevance" aria-label="Relevância">${opt("", "Qualquer relevância", f.min_relevance)}${opt("40", "Relevância média ou alta", f.min_relevance)}${opt("60", "Somente alta relevância", f.min_relevance)}</select>
         <label class="check" title="Receita, gov.br, Câmara, Senado, SEFAZ, CONFAZ, Comitê Gestor e outras fontes oficiais"><input type="checkbox" name="${fiscal ? "doc_type" : "official"}" value="${fiscal ? "oficial" : "1"}" ${(fiscal ? f.doc_type === "oficial" : f.official) ? "checked" : ""}> Somente oficiais</label>
         ${fiscal ? `<select name="legal_stage" aria-label="Estágio">${opt("", "Qualquer estágio", f.legal_stage)}${Object.entries(STAGES).map(([k, v]) => opt(k, v, f.legal_stage)).join("")}</select>` : ""}
+        ${isErp ? `<select name="erp_doc" aria-label="Documento ou obrigação">${opt("", "Qualquer documento", f.erp_doc)}${ERP_DOCS.map((x) => opt(x, x, f.erp_doc)).join("")}</select>`
+    : `<label class="check" title="Notas técnicas, leiautes, Ajustes SINIEF e mudanças que exigem ajuste em ERPs e emissores"><input type="checkbox" name="erp" value="1" ${f.erp ? "checked" : ""}> Exige ajuste em ERP</label>`}
         <span class="grow"></span>
         <select name="sort" aria-label="Ordenação">${q ? opt("auto", "Mais pertinentes à busca", f.sort || "auto") : ""}${opt("recent", "Mais recentes", f.sort)}${opt("relevance", "Mais relevantes", f.sort)}</select>
       </form>
@@ -279,15 +295,16 @@
       if (q) p.set("q", q);
       for (const [k, v] of data.entries()) if (v) p.set(k, v);
       if (ev.target.name === "period" && ev.target.value !== "custom") { p.delete("from"); p.delete("to"); }
-      location.hash = `#/${isAll ? "todas" : "c/" + cat}${p.toString() ? "?" + p : ""}`;
+      location.hash = `#/${base}${p.toString() ? "?" + p : ""}`;
     });
     view.querySelectorAll(".chip").forEach((b) => b.addEventListener("click", () => { location.hash = `#/todas?q=${encodeURIComponent(b.dataset.q)}`; }));
 
     const apiParams = new URLSearchParams();
     if (q) apiParams.set("q", q);
     apiParams.set("category", isAll ? (f.category || "todas") : cat);
-    ["source", "min_relevance", "doc_type", "legal_stage", "sort"].forEach((k) => f[k] && apiParams.set(k, f[k]));
+    ["source", "min_relevance", "doc_type", "legal_stage", "erp_doc", "sort"].forEach((k) => f[k] && apiParams.set(k, f[k]));
     if (f.official) apiParams.set("official", "true");
+    if (isErp || f.erp) apiParams.set("erp", "true");
     if (f.period && f.period !== "custom") {
       const start = periodStart(f.period);
       if (start) apiParams.set("from", start);
@@ -329,6 +346,7 @@
         <h2>${esc(a.title)}</h2>
         <div class="meta"><span class="outlet">${esc(a.outlet)}</span>${pubDate(a)}<span>· coletada em ${fmtLocal(a.collected_at)}</span></div>
         ${a.stage_note ? `<div class="notice">${esc(a.stage_note)}</div>` : ""}
+        ${a.erp_impact ? `<div class="notice erp">Pode exigir ajuste em sistemas/ERP${(a.erp_docs || []).length ? ` (${esc(a.erp_docs.join(", "))})` : ""}: ${esc(a.erp_reason || "mudança técnica")}. Confira na publicação oficial a versão, os prazos de homologação e de produção.</div>` : ""}
         ${a.legal_stage && a.legal_stage !== "norma_em_vigor" && a.legislative ? `<div class="notice">Classificação automática. Confirme a situação da norma na publicação oficial antes de aplicar.</div>` : ""}
         ${a.summary ? `<h4>Resumo <span class="tag">${providerLabel(a)}</span></h4><p>${esc(a.summary)}</p>` : ""}
         ${a.summary_lang === "en" && (!a.provider || a.provider === "regras") ? `<p class="hint">Texto da fonte em inglês. A tradução e o resumo em português ficam disponíveis ao ligar a IA (veja o arquivo .env).</p>` : ""}
