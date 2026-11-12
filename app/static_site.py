@@ -5,6 +5,7 @@ com o mesmo comportamento da API do servidor local.
 """
 import json
 import os
+import re
 import shutil
 from datetime import timedelta
 from pathlib import Path
@@ -82,10 +83,17 @@ def export(out_dir: Path) -> dict:
         shutil.copy2(config.WEB_DIR / f, out_dir / f)
     html = (config.WEB_DIR / "index.html").read_text(encoding="utf-8")
     html = html.replace('href="/static/styles.css"', 'href="styles.css"')
-    html = html.replace('<script src="/static/app.js"></script>',
-                        '<script src="static-api.js"></script>\n<script src="app.js"></script>')
+    scripts = '<script src="static-api.js"></script>\n<script src="app.js"></script>'
+    csp = CSP
+    gc = _goatcounter_code()
+    if gc:
+        shutil.copy2(config.WEB_DIR / "contador.js", out_dir / "contador.js")
+        scripts += f'\n<script src="contador.js" data-goatcounter-code="{gc}"></script>'
+        csp = csp.replace("script-src 'self'", "script-src 'self' https://gc.zgo.at")
+        csp = csp.replace("connect-src 'self'", f"connect-src 'self' https://{gc}.goatcounter.com")
+    html = html.replace('<script src="/static/app.js"></script>', scripts)
     html = html.replace('<meta charset="utf-8">',
-                        f'<meta charset="utf-8">\n  <meta http-equiv="Content-Security-Policy" content="{CSP}">\n'
+                        f'<meta charset="utf-8">\n  <meta http-equiv="Content-Security-Policy" content="{csp}">\n'
                         '  <meta name="referrer" content="strict-origin-when-cross-origin">', 1)
     if "static-api.js" not in html or "Content-Security-Policy" not in html:
         raise RuntimeError("web/index.html mudou: não foi possível adaptar a página para a versão estática")
@@ -119,6 +127,18 @@ def export(out_dir: Path) -> dict:
     _write(out_dir / "data" / "fontes.json", {"generated_at": generated, "sources": public_sources, "runs": runs})
     _write(out_dir / "data" / "status.json", {"generated_at": generated})
     return {"articles": len(articles), "generated_at": generated}
+
+
+def _goatcounter_code() -> str:
+    """Código do site no GoatCounter (a parte antes de .goatcounter.com). Vazio = contador desligado."""
+    code = os.environ.get("GOATCOUNTER_CODE", "").strip().lower()
+    if code.startswith("https://"):  # aceita também o endereço completo colado por engano
+        code = code[8:].split(".goatcounter.com")[0]
+    code = code.removesuffix(".goatcounter.com")
+    if code and not re.fullmatch(r"[a-z0-9-]{2,50}", code):
+        print(f"GOATCOUNTER_CODE inválido ({code!r}); contador de acessos desligado")
+        return ""
+    return code
 
 
 def _write(path: Path, data) -> None:

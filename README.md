@@ -82,6 +82,18 @@ Configuração única no repositório: **Settings › Pages › Source: GitHub A
 
 IA opcional, sem expor a chave: em **Settings › Secrets and variables › Actions**, crie o secret `ANTHROPIC_API_KEY` e a variável `LLM_PROVIDER` = `anthropic`. O arquivo `.env` nunca vai para o GitHub.
 
+### Contador de acessos (opcional, grátis)
+
+O site publicado pode contar os acessos com o [GoatCounter](https://www.goatcounter.com): gratuito, sem cookies e sem guardar dados pessoais (por isso não precisa de aviso de cookies).
+
+1. Crie a conta em https://www.goatcounter.com/signup. Em **Code**, escolha um nome curto, por exemplo `radar-leandro`; o painel fica em `https://radar-leandro.goatcounter.com`.
+2. No GitHub: **Settings › Secrets and variables › Actions › Variables › New repository variable**, nome `GOATCOUNTER_CODE`, valor `radar-leandro` (só o código).
+3. Rode **Actions › Coletar notícias e publicar o site › Run workflow** (ou espere a próxima coleta).
+
+O painel mostra visitantes e páginas vistas por dia e por hora, as abas mais abertas, de onde vieram (Google, WhatsApp, links diretos), país, navegador, sistema e tamanho de tela. Os acessos de agora aparecem em poucos segundos. Para não contar os seus próprios acessos, abra o painel em cada navegador seu e use **Settings › Ignore IPs** (ou a opção de ignorar o navegador). Para desligar, apague a variável `GOATCOUNTER_CODE` e rode o workflow de novo.
+
+Só são contados acessos a partir da ativação: o GitHub Pages não guarda registro de visitas, então os acessos anteriores não podem ser recuperados. A versão local (`iniciar.bat`) não envia nada.
+
 Para gerar o site localmente sem coletar: `.venv\Scripts\python.exe gerar_site.py --sem-coleta` (resultado em `site/`).
 
 ## Estrutura
@@ -98,7 +110,7 @@ app/db.py                SQLite, busca FTS5, consultas
 app/scheduler.py         ciclo de coleta, histórico, falhas
 app/collectors/          rss.py, html.py, search.py (Google/Bing Notícias)
 app/processing/          classificação, status legal, duplicidade, resumo, leitura de página, IA opcional
-web/                     interface (HTML, CSS e JavaScript, sem build); static-api.js atende a versão online
+web/                     interface (HTML, CSS e JavaScript, sem build); static-api.js atende a versão online; contador.js conta os acessos (GoatCounter)
 data/radar.db            banco SQLite (criado na 1ª execução)
 tests/                   testes: .venv\Scripts\python.exe -m unittest discover tests
 ```

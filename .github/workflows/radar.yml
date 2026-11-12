@@ -28,6 +28,7 @@ jobs:
       ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-haiku-5-5' }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       LLM_MAX_PER_RUN: ${{ vars.LLM_MAX_PER_RUN || '40' }}
+      GOATCOUNTER_CODE: ${{ vars.GOATCOUNTER_CODE }}   # contador de acessos (opcional, ver README)
     steps:
       - uses: actions/checkout@v4
         with:

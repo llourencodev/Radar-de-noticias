@@ -119,5 +119,21 @@ class TestAcbr(unittest.TestCase):
         self.assertIn("acbr", [c[0] for c in cats])
 
 
+class TestContadorAcessos(unittest.TestCase):
+    def _code(self, valor):
+        import os
+        from unittest import mock
+        from app import static_site
+        with mock.patch.dict(os.environ, {"GOATCOUNTER_CODE": valor}):
+            return static_site._goatcounter_code()
+
+    def test_codigo(self):
+        self.assertEqual(self._code(""), "")
+        self.assertEqual(self._code("radar-leandro"), "radar-leandro")
+        self.assertEqual(self._code(" https://Radar-Leandro.goatcounter.com/count "), "radar-leandro")
+        self.assertEqual(self._code("radar.goatcounter.com"), "radar")
+        self.assertEqual(self._code('x" onload="alert(1)'), "")
+
+
 if __name__ == "__main__":
     unittest.main()
