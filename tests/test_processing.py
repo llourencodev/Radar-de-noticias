@@ -36,6 +36,18 @@ class TestClassificacao(unittest.TestCase):
         cats = [c[0] for c in classify.classify("Anthropic lança novo modelo Claude", "", None, "rss")]
         self.assertEqual(cats[0], "ia")
 
+    def test_politica_fiscal_entra_em_fiscal(self):
+        # fontes com filter=keywords (Agência Senado, Câmara, Agência Brasil) só olham o título
+        for titulo in ["Senado aprova texto-base do ajuste fiscal com impacto de até R$ 56,1 bi",
+                       "Câmara aprova pacote de corte de gastos",
+                       "Governo propõe mudança no arcabouço fiscal",
+                       "Haddad diz que meta fiscal será cumprida"]:
+            cats = classify.classify(titulo, "", None, "rss", require_title=True)
+            self.assertIn("fiscal", [c[0] for c in cats], titulo)
+        cats = classify.classify("Apple lança iPhone com orçamento recorde de marketing", "", None, "rss",
+                                 require_title=True)
+        self.assertNotIn("fiscal", [c[0] for c in cats])
+
     def test_oficial(self):
         self.assertTrue(classify.is_official("gov.br", False))
         self.assertTrue(classify.is_official("www12.senado.leg.br", False))
