@@ -67,6 +67,17 @@ void main() {
     expect(const Filters(query: 'modelo ia').apply(data.list, now: now).map((a) => a.id), [3]);
   });
 
+  test('sem rede: tenta de novo e explica o erro', () async {
+    var calls = 0;
+    final api = RadarApi(client: MockClient((req) async {
+      calls++;
+      throw http.ClientException('SocketException: Failed host lookup');
+    }));
+    await expectLater(api.remoteGeneratedAt(), throwsA(isA<RadarException>()
+        .having((e) => e.message, 'mensagem', contains('Sem conexão com llourencodev.github.io'))));
+    expect(calls, 2);
+  });
+
   test('normaliza o endereço do site', () {
     expect(RadarApi.normalizeUrl('usuario.github.io/radar'), 'https://usuario.github.io/radar/');
     expect(RadarApi.normalizeUrl('https://x.io/r/index.html'), 'https://x.io/r/');

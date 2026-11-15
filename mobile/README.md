@@ -26,6 +26,23 @@ descompacte e abra o `app-release.apk` no celular (é preciso permitir "instalar
 O APK é assinado com a chave de depuração do Flutter: serve para testar. Para publicar na Play Store,
 será preciso criar uma chave própria (ver "Publicar" abaixo).
 
+## Testar no PC (Windows), passo a passo
+
+O jeito mais prático é o **VS Code** com o emulador do **Android Studio**. (O Visual Studio “grande”
+não abre projetos Flutter; ele serve para .NET/MAUI.)
+
+1. Instale o [Android Studio](https://developer.android.com/studio). Na primeira abertura, deixe ele baixar o
+   *Android SDK*. Depois, em **More Actions → Virtual Device Manager**, crie um emulador (ex.: Pixel 8, Android 15).
+2. Instale o Flutter: no PowerShell, `winget install --id=Google.Flutter -e` (ou baixe o zip em docs.flutter.dev e
+   coloque a pasta `flutter\bin` no PATH). Feche e abra o terminal e rode `flutter doctor --android-licenses`
+   (responda `y`) e `flutter doctor` até tudo ficar verde no Android.
+3. Instale o [VS Code](https://code.visualstudio.com/) e a extensão **Flutter** (o VS Code sugere ao abrir a pasta).
+4. No VS Code: **File → Open Folder… → `mobile`**. Na barra de baixo, escolha o emulador (ou o celular ligado
+   no USB com “Depuração USB” ativa) e aperte **F5**.
+
+Com o app rodando pelo VS Code, qualquer erro aparece completo na aba **Debug Console**, e salvar um arquivo
+atualiza o app na hora (*hot reload*).
+
 ## Rodar e compilar no computador
 
 Requisitos: [Flutter](https://docs.flutter.dev/get-started/install) 3.50 ou mais novo e o Android Studio (SDK do Android).

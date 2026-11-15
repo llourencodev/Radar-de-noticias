@@ -5,6 +5,7 @@
 /// quando `data/status.json` indica uma coleta mais nova.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -54,8 +55,30 @@ class RadarApi {
   Uri _uri(String path) =>
       Uri.parse('$baseUrl$path').replace(queryParameters: {'t': '${DateTime.now().millisecondsSinceEpoch}'});
 
+  /// GET com uma nova tentativa: no celular a primeira conexão às vezes falha
+  /// (rede trocando de Wi-Fi para dados, aparelho acordando).
+  Future<http.Response> _request(String path) async {
+    Object? last;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      if (attempt > 0) await Future<void>.delayed(const Duration(seconds: 2));
+      try {
+        return await _client.get(_uri(path), headers: {'Cache-Control': 'no-cache'}).timeout(const Duration(seconds: 60));
+      } on SocketException catch (e) {
+        last = e;
+      } on http.ClientException catch (e) {
+        last = e;
+      } on TimeoutException catch (e) {
+        last = e;
+      } on HandshakeException catch (e) {
+        last = e;
+      }
+    }
+    throw RadarException('Sem conexão com ${Uri.parse(baseUrl).host}. Confira se o celular está com internet '
+        '(Wi-Fi ou dados móveis) e se o app tem permissão para usar a rede.\nDetalhe: $last');
+  }
+
   Future<String> _get(String path) async {
-    final r = await _client.get(_uri(path), headers: {'Cache-Control': 'no-cache'}).timeout(const Duration(seconds: 60));
+    final r = await _request(path);
     if (r.statusCode == 404) {
       throw RadarException('O endereço $baseUrl não tem $path (erro 404). '
           'Confira o endereço no menu ⋮ > Endereço do Radar (maiúsculas e minúsculas contam).');
