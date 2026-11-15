@@ -1,0 +1,7 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    { "name": "Radar (debug)", "type": "dart", "request": "launch", "program": "lib/main.dart" },
+    { "name": "Radar (release)", "type": "dart", "request": "launch", "program": "lib/main.dart", "flutterMode": "release" }
+  ]
+}

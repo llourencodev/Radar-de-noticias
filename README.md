@@ -113,3 +113,7 @@ tests/                   testes: .venv\Scripts\python.exe -m unittest discover t
 - **Notas técnicas / ERP**: notícias que exigem ajuste ou implementação em sistemas (notas técnicas de NF-e, NFC-e, NFS-e, CT-e, MDF-e; leiautes, schemas e regras de validação; Ajustes SINIEF e Atos COTEPE; guias e PVAs do SPED/EFD; IBS/CBS e cClassTrib nos documentos fiscais) recebem o selo “Ajuste em ERP” com os documentos afetados. Ficam reunidas na aba *Notas técnicas / ERP* (com filtro por documento) e podem ser filtradas em qualquer aba pela opção “Exige ajuste em ERP”. As regras estão em `app/processing/erp.py`; ao mudá-las, aumente `RULES_VERSION` para que as notícias já salvas sejam reavaliadas.
 - Resumos, pontos e impactos são identificados como interpretação automática; colunas de opinião são sinalizadas.
 - Uma fonte com falha não interrompe as outras.
+
+## App Android
+
+O app para celular (Flutter) fica em [`mobile/`](mobile/README.md). Ele lê o mesmo `data/radar.json` publicado no GitHub Pages; o APK de teste é gerado pelo workflow **App Android (Flutter)**.
