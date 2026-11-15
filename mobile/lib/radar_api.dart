@@ -19,7 +19,7 @@ import 'models.dart';
 /// (`--dart-define=RADAR_URL=https://...`) ou na tela de configurações do app.
 const String defaultBaseUrl = String.fromEnvironment(
   'RADAR_URL',
-  defaultValue: 'https://llourencodev.github.io/radar-de-noticias/',
+  defaultValue: 'https://llourencodev.github.io/Radar-de-noticias/',
 );
 
 class RadarApi {
@@ -56,6 +56,10 @@ class RadarApi {
 
   Future<String> _get(String path) async {
     final r = await _client.get(_uri(path), headers: {'Cache-Control': 'no-cache'}).timeout(const Duration(seconds: 60));
+    if (r.statusCode == 404) {
+      throw RadarException('O endereço $baseUrl não tem $path (erro 404). '
+          'Confira o endereço no menu ⋮ > Endereço do Radar (maiúsculas e minúsculas contam).');
+    }
     if (r.statusCode != 200) {
       throw RadarException('Não foi possível ler $path (erro ${r.statusCode}).');
     }

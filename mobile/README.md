@@ -40,7 +40,7 @@ flutter build apk --release      # gera build/app/outputs/flutter-apk/app-releas
 
 ### Endereço do site
 
-Por padrão o app lê `https://llourencodev.github.io/radar-de-noticias/`. Para usar outro endereço:
+Por padrão o app lê `https://llourencodev.github.io/Radar-de-noticias/`. Para usar outro endereço:
 
 - no app: menu **⋮ → Endereço do Radar**; ou
 - na compilação: `flutter build apk --dart-define=RADAR_URL=https://seu-endereco/`.
