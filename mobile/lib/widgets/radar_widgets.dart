@@ -82,6 +82,8 @@ class ArticleImage extends StatelessWidget {
       width: double.infinity,
       height: double.infinity,
       gaplessPlayback: true,
+      // alguns sites recusam imagens pedidas sem um navegador conhecido
+      headers: const {'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Mobile Safari/537.36'},
       loadingBuilder: (context, child, progress) =>
           progress == null ? child : Container(color: context.rc.surface2),
       errorBuilder: (context, _, _) => _unavailable(context),
