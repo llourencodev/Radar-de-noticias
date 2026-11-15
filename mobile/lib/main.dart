@@ -1,32 +1,35 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'app_state.dart';
 import 'favorites.dart';
 import 'radar_api.dart';
 import 'screens/home_screen.dart';
+import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final api = RadarApi();
-  final favorites = Favorites();
-  await Future.wait([api.loadSettings(), favorites.load()]);
-  runApp(RadarApp(api: api, favorites: favorites));
+  final state = AppState(api: RadarApi(), favorites: Favorites());
+  await Future.wait([state.api.loadSettings(), state.favorites.load(), state.loadPrefs()]);
+  runApp(RadarApp(state: state));
 }
 
 class RadarApp extends StatelessWidget {
-  final RadarApi api;
-  final Favorites favorites;
+  final AppState state;
 
-  const RadarApp({super.key, required this.api, required this.favorites});
+  const RadarApp({super.key, required this.state});
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xFF0F766E);
-    return MaterialApp(
-      title: 'Radar de Notícias',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: seed, useMaterial3: true, brightness: Brightness.light),
-      darkTheme: ThemeData(colorSchemeSeed: seed, useMaterial3: true, brightness: Brightness.dark),
-      home: HomeScreen(api: api, favorites: favorites),
+    return ListenableBuilder(
+      listenable: state,
+      builder: (context, _) => MaterialApp(
+        title: 'Radar de Notícias',
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(RadarColors.light),
+        darkTheme: buildTheme(RadarColors.dark),
+        themeMode: switch (state.theme) { 'light' => ThemeMode.light, 'dark' => ThemeMode.dark, _ => ThemeMode.system },
+        home: HomeScreen(state: state),
+      ),
     );
   }
 }

@@ -1,138 +1,212 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:material_ui/material_ui.dart';
 
-import '../favorites.dart';
+import '../app_state.dart';
 import '../format.dart';
 import '../models.dart';
+import '../theme.dart';
+import '../widgets/radar_widgets.dart';
 
-/// Detalhes da notícia: resumo, pontos principais, impacto no ERP e outras fontes do mesmo assunto.
+/// Detalhes da notícia (a janela que o site abre em "Detalhes e impactos").
 class ArticleScreen extends StatelessWidget {
   final Article article;
-  final RadarData? data;
-  final Favorites favorites;
-
-  const ArticleScreen({super.key, required this.article, required this.data, required this.favorites});
+  final AppState state;
+  const ArticleScreen({super.key, required this.article, required this.state});
 
   @override
   Widget build(BuildContext context) {
     final a = article;
-    final theme = Theme.of(context);
+    final data = state.data;
+    final rc = context.rc;
     final related = data?.related(a) ?? const <Article>[];
-    final cats = a.categories.map((s) => data?.category(s)).whereType<Category>().toList();
-    final stage = a.legalStage != null && a.legalStage != 'nao_determinado' ? data?.stages[a.legalStage] : null;
+    final aiTag = a.aiSummary ? 'IA (${a.provider})' : 'regras automáticas';
+    final providerLabel = a.aiSummary
+        ? 'Resumo gerado por IA (${a.provider})'
+        : a.summaryLang == 'en'
+            ? 'Trecho original (inglês)'
+            : 'Resumo automático com trechos da fonte';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(a.source, maxLines: 1, overflow: TextOverflow.ellipsis),
-        actions: [
-          IconButton(
-            tooltip: 'Copiar link',
-            icon: const Icon(Icons.link),
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: a.url));
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copiado')));
-              }
-            },
-          ),
-          ListenableBuilder(
-            listenable: favorites,
-            builder: (context, _) {
-              final fav = favorites.contains(a);
-              return IconButton(
-                tooltip: fav ? 'Remover dos favoritos' : 'Salvar nos favoritos',
-                icon: Icon(fav ? Icons.bookmark : Icons.bookmark_border),
-                onPressed: () => favorites.toggle(a),
-              );
-            },
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-        children: [
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            for (final c in cats)
-              Chip(
-                label: Text(c.name),
-                labelStyle: TextStyle(color: c.color, fontWeight: FontWeight.w600),
-                side: BorderSide(color: c.color.withValues(alpha: 0.5)),
-                visualDensity: VisualDensity.compact,
+    Widget h4(String title, [String? tag]) => Padding(
+          padding: const EdgeInsets.only(top: 20, bottom: 8),
+          child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, runSpacing: 4, children: [
+            Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: rc.text)),
+            if (tag != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                decoration: BoxDecoration(color: rc.surface2, borderRadius: BorderRadius.circular(6), border: Border.all(color: rc.border)),
+                child: Text(tag, style: TextStyle(fontSize: 11, color: rc.text3)),
               ),
-            if (a.isOfficial)
-              const Chip(avatar: Icon(Icons.verified, size: 16), label: Text('Publicação oficial'), visualDensity: VisualDensity.compact),
-            if (stage != null) Chip(label: Text(stage), visualDensity: VisualDensity.compact),
           ]),
-          const SizedBox(height: 12),
-          Text(a.title, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Text('${a.source} · ${formatDate(a)}', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          if (a.imageUrl?.startsWith('https://') == true) ...[
-            const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(a.imageUrl!,
-                  fit: BoxFit.cover,
-                  height: 200,
-                  width: double.infinity,
-                  errorBuilder: (_, _, _) => const SizedBox.shrink()),
-            ),
-          ],
-          if (a.summary?.isNotEmpty == true) ...[
-            _section(context, 'Resumo'),
-            Text(a.summary!, style: theme.textTheme.bodyLarge),
-          ],
-          if (a.keyPoints.isNotEmpty) ...[
-            _section(context, 'Pontos principais'),
-            for (final p in a.keyPoints)
+        );
+    Widget bullets(List<String> items) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final p in items)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('•  '),
-                  Expanded(child: Text(p, style: theme.textTheme.bodyMedium)),
+                  Text('•  ', style: TextStyle(color: rc.text2)),
+                  Expanded(child: Text(p, style: TextStyle(fontSize: 14.5, height: 1.45, color: rc.text))),
                 ]),
               ),
           ],
-          if (a.excerpt?.isNotEmpty == true && a.excerpt != a.summary) ...[
-            _section(context, 'Trecho da fonte'),
-            Text(a.excerpt!, style: theme.textTheme.bodyMedium),
-          ],
-          if (a.erpImpact) ...[
-            _section(context, 'Impacto no ERP'),
-            if (a.erpDocs.isNotEmpty)
-              Wrap(spacing: 6, children: [for (final d in a.erpDocs) Chip(label: Text(d), visualDensity: VisualDensity.compact)]),
-            if (a.erpReason?.isNotEmpty == true) Text(a.erpReason!, style: theme.textTheme.bodyMedium),
-          ],
-          if (related.isNotEmpty) ...[
-            _section(context, 'Mesma notícia e atualizações'),
-            for (final r in related)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(r.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-                subtitle: Text('${r.source} · ${formatDate(r)}${r.isUpdate ? ' · atualização' : ''}'),
-                trailing: const Icon(Icons.open_in_new, size: 18),
-                onTap: () => _open(context, r.url),
+        );
+    Widget notice(String text, {bool erp = false}) => Container(
+          margin: const EdgeInsets.only(top: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: erp ? (rc.isDark ? const Color(0x2EC2410C) : const Color(0xFFFFF7ED)) : rc.accentSoft,
+            borderRadius: BorderRadius.circular(10),
+            border: Border(left: BorderSide(color: erp ? erpColor : rc.accent, width: 3)),
+          ),
+          child: Text(text, style: TextStyle(fontSize: 13.5, height: 1.45, color: rc.text)),
+        );
+    final hint = TextStyle(fontSize: 13, color: rc.text3, height: 1.45);
+
+    return Scaffold(
+      backgroundColor: rc.surface,
+      body: CustomScrollView(slivers: [
+        SliverAppBar(
+          pinned: true,
+          expandedHeight: MediaQuery.sizeOf(context).width * 9 / 16,
+          backgroundColor: rc.surface,
+          foregroundColor: rc.text,
+          leading: Padding(
+            padding: const EdgeInsets.all(6),
+            child: IconButton.filledTonal(
+              tooltip: 'Fechar',
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.all(6),
+              child: IconButton.filledTonal(
+                tooltip: 'Copiar link',
+                icon: const Icon(Icons.link),
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: a.url));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copiado')));
+                  }
+                },
               ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(6),
+              child: ListenableBuilder(
+                listenable: state.favorites,
+                builder: (context, _) {
+                  final fav = state.favorites.contains(a);
+                  return IconButton.filledTonal(
+                    tooltip: fav ? 'Remover dos favoritos' : 'Salvar nos favoritos',
+                    icon: Icon(fav ? Icons.bookmark : Icons.bookmark_border),
+                    onPressed: () => state.favorites.toggle(a),
+                  );
+                },
+              ),
+            ),
           ],
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _open(context, a.url),
-        icon: const Icon(Icons.open_in_new),
-        label: const Text('Abrir notícia'),
-      ),
+          flexibleSpace: FlexibleSpaceBar(background: ArticleImage(article: a, data: data)),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 40),
+          sliver: SliverList.list(children: [
+            Badges(a: a, data: data, full: true),
+            const SizedBox(height: 12),
+            Text(a.title, style: TextStyle(fontSize: 23, height: 1.25, fontWeight: FontWeight.w700, color: rc.text)),
+            const SizedBox(height: 8),
+            ArticleMeta(a),
+            if (a.collectedAt != null)
+              Text('coletada em ${fmtDateTime(DateTime.parse(a.collectedAt!))}', style: hint),
+            if (a.stageNote != null) notice(a.stageNote!),
+            if (a.erpImpact)
+              notice(
+                  'Pode exigir ajuste em sistemas/ERP${a.erpDocs.isNotEmpty ? ' (${a.erpDocs.join(', ')})' : ''}: '
+                  '${a.erpReason ?? 'mudança técnica'}. Confira na publicação oficial a versão, os prazos de homologação e de produção.',
+                  erp: true),
+            if (a.legalStage != null && a.legalStage != 'norma_em_vigor' && a.legislative)
+              notice('Classificação automática. Confirme a situação da norma na publicação oficial antes de aplicar.'),
+            if (a.summary != null) ...[
+              h4('Resumo', providerLabel),
+              Text(a.summary!, style: TextStyle(fontSize: 15, height: 1.5, color: rc.text)),
+            ],
+            if (a.summaryLang == 'en' && !a.aiSummary)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Texto da fonte em inglês. A tradução e o resumo em português ficam disponíveis ao ligar a IA.',
+                    style: hint),
+              ),
+            if (a.keyPoints.isNotEmpty) ...[
+              h4('Principais pontos', a.aiSummary ? 'IA' : 'frases da fonte'),
+              bullets(a.keyPoints),
+            ],
+            if (a.impacts.isNotEmpty) ...[
+              h4('Possíveis impactos para empresas e ERP', 'interpretação · $aiTag'),
+              bullets(a.impacts),
+            ],
+            if (a.legalRefs.isNotEmpty) ...[
+              h4('Normas citadas', 'extraídas do texto'),
+              bullets(a.legalRefs),
+            ],
+            if (a.terms.isNotEmpty) ...[
+              h4('Termos técnicos'),
+              for (final t in a.terms)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text.rich(TextSpan(children: [
+                    TextSpan(text: '${t.term}: ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    TextSpan(text: t.explanation),
+                  ]), style: TextStyle(fontSize: 14, height: 1.45, color: rc.text)),
+                ),
+            ],
+            if (related.isNotEmpty) ...[
+              h4('Mesma notícia e atualizações'),
+              for (final r in related)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: InkWell(
+                    onTap: () => openOriginal(context, r.url),
+                    child: Text.rich(TextSpan(children: [
+                      if (r.isUpdate) const TextSpan(text: 'Atualização: ', style: TextStyle(fontWeight: FontWeight.w700)),
+                      TextSpan(text: r.title, style: TextStyle(color: rc.accent, decoration: TextDecoration.underline)),
+                      TextSpan(text: ' — ${r.source}, ${r.publishedAt != null ? formatDate(r) : 'data não confirmada'}'),
+                    ]), style: TextStyle(fontSize: 14, height: 1.45, color: rc.text)),
+                  ),
+                ),
+            ],
+            h4('Natureza do conteúdo'),
+            Text(
+              '${a.nature == 'opiniao' ? 'Opinião/coluna: reflete a visão do autor.' : 'Fato relatado pela fonte.'} '
+              'Resumo, pontos e impactos são interpretações automáticas e não substituem a leitura do original.',
+              style: hint,
+            ),
+            const SizedBox(height: 18),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                onPressed: () => openOriginal(context, a.url),
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('Abrir publicação original'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: rc.accent,
+                  foregroundColor: rc.accentInk,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Fonte: ${a.sourceName ?? a.source}${a.validationStatus != null ? ' · status: ${a.validationStatus}' : ''}'
+              '${a.viaAggregator ? ' · link original não confirmado (abre pelo Google Notícias)' : ''}',
+              style: hint,
+            ),
+          ]),
+        ),
+      ]),
     );
-  }
-
-  static Widget _section(BuildContext context, String title) => Padding(
-        padding: const EdgeInsets.only(top: 20, bottom: 8),
-        child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-      );
-
-  static Future<void> _open(BuildContext context, String url) async {
-    final ok = await openArticle(url).catchError((_) => false);
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Não foi possível abrir o link')));
-    }
   }
 }

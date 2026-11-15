@@ -5,17 +5,21 @@ App para celular que mostra as notícias do Radar. Não tem servidor próprio: l
 
 ## O que o app faz
 
-- **Lista por categoria**: Fiscal, Reforma Tributária, ACBr, IA, Programação etc., com a contagem de cada uma
+O app reproduz o site no celular, com as mesmas cores (tema claro e escuro), o mesmo menu e as mesmas telas:
+
+- **Painel de inteligência**: números da coleta, Mais relevantes, Oficiais em destaque, Notas técnicas/ERP,
+  Últimas fiscais, Novidades de IA e Programação.
+- **Menu lateral** com as categorias e a contagem de cada uma, Notas técnicas / ERP e Todas as notícias
   (as categorias vêm do próprio `radar.json`, então uma categoria nova no site aparece sozinha no app).
-- **Filtros como no site**: período (última hora, 24 horas, hoje, 7/30/90 dias, 1 ano, tudo),
-  "Somente oficiais" (em Fiscal e Reforma considera o documento oficial, como o site) e busca sem acento.
-- **Detalhes da notícia**: resumo, pontos principais, trecho da fonte, impacto no ERP e
-  "Mesma notícia e atualizações" (outras fontes do mesmo assunto).
-- **Abrir a notícia original** no navegador e copiar o link.
-- **Favoritos** salvos só no aparelho. A notícia inteira fica guardada, então continua lá mesmo
-  depois de sair da janela de 90 dias do site.
+- **Cartões com a imagem da notícia**, os mesmos selos (categoria, publicação oficial, estágio da norma,
+  ajuste em ERP, atualização...) e o quadro "sem imagem" do site quando a fonte não tem foto.
+- **Os mesmos filtros**: período, categoria, fonte, relevância, somente oficiais, estágio da norma,
+  documento (ERP) e ordenação, além da busca sem acento.
+- **Detalhes da notícia** como a janela do site: resumo, pontos principais, impactos, normas citadas,
+  termos técnicos e "Mesma notícia e atualizações".
+- **Favoritos** salvos só no aparelho (a notícia inteira, para não sumir depois de 90 dias).
 - **Funciona sem internet** com a última coleta baixada. Ao abrir (ou voltar para o app) ele confere
-  `data/status.json` e só baixa tudo de novo se houver coleta mais nova. Puxe a lista para baixo para atualizar.
+  `data/status.json` e só baixa tudo de novo se houver coleta mais nova. Puxe a tela para baixo para atualizar.
 
 ## Instalar no celular sem compilar
 
@@ -70,7 +74,9 @@ Por padrão o app lê `https://llourencodev.github.io/Radar-de-noticias/`. Para 
 | `lib/radar_api.dart` | Download, cópia local e checagem de coleta nova |
 | `lib/filters.dart` | Categoria, período, oficiais e busca (mesmas regras do `web/app.js`) |
 | `lib/favorites.dart` | Favoritos no aparelho |
-| `lib/screens/` | Tela principal (Notícias / Favoritos) e detalhes da notícia |
+| `lib/theme.dart` | Cores do `web/styles.css` (claro e escuro) |
+| `lib/widgets/radar_widgets.dart` | Cartão, item de lista, selos e imagem, como no site |
+| `lib/screens/` | Menu e busca, Painel, listas com filtros, Favoritos e detalhes da notícia |
 | `test/radar_test.dart` | Testes dos filtros, favoritos e da tela principal |
 
 Identificador do app: `dev.llourenco.radar_noticias` (não pode mudar depois de publicar na Play Store).
