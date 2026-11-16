@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import config
 from .processing.normalize import fts_terms
+from .processing.origin import is_brazilian
 
 WRITE_LOCK = threading.RLock()
 
@@ -92,6 +93,7 @@ def connect() -> sqlite3.Connection:
     config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(config.DB_PATH, timeout=30, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    conn.create_function("is_br", 3, lambda d, l, s: int(is_brazilian(d, l, s)), deterministic=True)
     conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA busy_timeout=30000")
     return conn
@@ -319,6 +321,7 @@ def _row_to_article(r: sqlite3.Row) -> dict:
         except ValueError:
             d[k] = []
     d["categories"] = (d.get("categories") or "").split(",") if d.get("categories") else []
+    d["brasil"] = int(is_brazilian(d.get("outlet_domain"), d.get("lang"), d.get("source_id")))
     d.pop("title_norm", None)
     return d
 
@@ -329,7 +332,7 @@ def search_articles(q: str = "", category: str | None = None, source: str | None
                     doc_type: str | None = None, legal_stage: str | None = None,
                     sort: str = "auto", limit: int = 30, offset: int = 0,
                     include_duplicates: bool = False, erp: bool | None = None,
-                    erp_doc: str | None = None) -> dict:
+                    erp_doc: str | None = None, brasil: bool | None = None) -> dict:
     where, params = ["1=1"], []
     if not include_duplicates:
         where.append("a.is_duplicate=0")
@@ -351,6 +354,9 @@ def search_articles(q: str = "", category: str | None = None, source: str | None
     if official is not None:
         where.append("a.official=?")
         params.append(int(official))
+    if brasil is not None:
+        where.append("is_br(a.outlet_domain, a.lang, a.source_id)=?")
+        params.append(int(brasil))
     if doc_type:
         where.append("a.doc_type=?")
         params.append(doc_type)

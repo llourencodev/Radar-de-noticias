@@ -266,6 +266,8 @@
     const c = isErp ? ERP : isAll ? { name: "Todas as notícias", color: "#0b5cad" } : catOf(cat);
     const fiscal = cat === "fiscal" || cat === "reforma" || isErp;
     const f = Object.fromEntries(params.entries());
+    // "Notícias Brasil" vale para todas as categorias: fica marcado ao trocar de aba
+    if (!("brasil" in f) && store.get("radar-brasil", "") === "1") f.brasil = "1";
     const q = f.q || "";
     $("#searchInput").value = q;
     const opt = (v, label, cur) => `<option value="${esc(v)}" ${String(cur ?? "") === String(v) ? "selected" : ""}>${esc(label)}</option>`;
@@ -287,6 +289,7 @@
         <input type="date" name="from" value="${esc(f.from || "")}" aria-label="De" ${f.period === "custom" ? "" : "hidden"}>
         <input type="date" name="to" value="${esc(f.to || "")}" aria-label="Até" ${f.period === "custom" ? "" : "hidden"}>
         <select name="min_relevance" aria-label="Relevância">${opt("", "Qualquer relevância", f.min_relevance)}${opt("40", "Relevância média ou alta", f.min_relevance)}${opt("60", "Somente alta relevância", f.min_relevance)}</select>
+        <label class="check" title="Somente notícias de veículos e órgãos brasileiros (sites .br, fontes brasileiras e buscas em português)"><input type="checkbox" name="brasil" value="1" ${f.brasil ? "checked" : ""}> Notícias Brasil</label>
         <label class="check" title="Receita, gov.br, Câmara, Senado, SEFAZ, CONFAZ, Comitê Gestor e outras fontes oficiais"><input type="checkbox" name="${fiscal ? "doc_type" : "official"}" value="${fiscal ? "oficial" : "1"}" ${(fiscal ? f.doc_type === "oficial" : f.official) ? "checked" : ""}> Somente oficiais</label>
         ${fiscal ? `<select name="legal_stage" aria-label="Estágio">${opt("", "Qualquer estágio", f.legal_stage)}${Object.entries(STAGES).map(([k, v]) => opt(k, v, f.legal_stage)).join("")}</select>` : ""}
         ${isErp ? `<select name="erp_doc" aria-label="Documento ou obrigação">${opt("", "Qualquer documento", f.erp_doc)}${ERP_DOCS.map((x) => opt(x, x, f.erp_doc)).join("")}</select>`
@@ -304,6 +307,7 @@
       const p = new URLSearchParams();
       if (q) p.set("q", q);
       for (const [k, v] of data.entries()) if (v) p.set(k, v);
+      if (ev.target.name === "brasil") store.set("radar-brasil", ev.target.checked ? "1" : "");
       if (ev.target.name === "period" && ev.target.value !== "custom") { p.delete("from"); p.delete("to"); }
       location.hash = `#/${base}${p.toString() ? "?" + p : ""}`;
     });
@@ -314,6 +318,7 @@
     apiParams.set("category", isAll ? (f.category || "todas") : cat);
     ["source", "min_relevance", "doc_type", "legal_stage", "erp_doc", "sort"].forEach((k) => f[k] && apiParams.set(k, f[k]));
     if (f.official) apiParams.set("official", "true");
+    if (f.brasil) apiParams.set("brasil", "true");
     if (isErp || f.erp) apiParams.set("erp", "true");
     if (f.period && f.period !== "custom") {
       const start = periodStart(f.period);
