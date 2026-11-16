@@ -5,6 +5,7 @@
     "type": "html",
     "url": "https://www.gov.br/receitafederal/pt-br/assuntos/noticias/{year}",
     "category": "fiscal",
+    "country": "BR",
     "official": true,
     "priority": 3,
     "options": {
@@ -20,6 +21,7 @@
     "type": "html",
     "url": "https://www.gov.br/fazenda/pt-br/assuntos/noticias",
     "category": "fiscal",
+    "country": "BR",
     "official": true,
     "priority": 2,
     "options": {
@@ -34,6 +36,7 @@
     "type": "html",
     "url": "https://www.nfe.fazenda.gov.br/portal/principal.aspx",
     "category": "fiscal",
+    "country": "BR",
     "official": true,
     "priority": 3,
     "options": {
@@ -47,6 +50,7 @@
     "type": "html",
     "url": "https://www.confaz.fazenda.gov.br/legislacao/convenios/{year}",
     "category": "fiscal",
+    "country": "BR",
     "official": true,
     "priority": 3,
     "options": {
@@ -64,6 +68,7 @@
     "type": "html",
     "url": "https://www.confaz.fazenda.gov.br/legislacao/ajustes/{year}/{year}",
     "category": "fiscal",
+    "country": "BR",
     "official": true,
     "priority": 3,
     "options": {
@@ -81,6 +86,7 @@
     "type": "html",
     "url": "https://www.confaz.fazenda.gov.br/legislacao/atos/{year}",
     "category": "fiscal",
+    "country": "BR",
     "official": true,
     "priority": 2,
     "options": {
@@ -98,6 +104,7 @@
     "type": "rss",
     "url": "https://www12.senado.leg.br/noticias/rss",
     "category": "fiscal",
+    "country": "BR",
     "official": true,
     "priority": 2,
     "options": {
@@ -110,6 +117,7 @@
     "type": "rss",
     "url": "https://www.camara.leg.br/noticias/rss/dinamico/ECONOMIA",
     "category": "fiscal",
+    "country": "BR",
     "official": true,
     "priority": 2,
     "options": {
@@ -122,6 +130,7 @@
     "type": "rss",
     "url": "https://www.camara.leg.br/noticias/rss/ultimas-noticias",
     "category": "fiscal",
+    "country": "BR",
     "official": true,
     "priority": 1,
     "options": {
@@ -134,6 +143,7 @@
     "type": "rss",
     "url": "https://www.contabeis.com.br/rss/noticias/",
     "category": "fiscal",
+    "country": "BR",
     "official": false,
     "priority": 1,
     "options": {}
@@ -144,6 +154,7 @@
     "type": "rss",
     "url": "https://www.jota.info/feed",
     "category": "fiscal",
+    "country": "BR",
     "official": false,
     "priority": 1,
     "options": {
@@ -441,6 +452,7 @@
     "type": "rss",
     "url": "https://comsefaz.org.br/novo/feed/",
     "category": "reforma",
+    "country": "BR",
     "official": true,
     "priority": 3,
     "options": {
@@ -454,6 +466,7 @@
     "type": "html",
     "url": "https://sefaz.es.gov.br/tags/reforma-tribut-ria-466nwrnf1v26z04cb1c4sgkrd4",
     "category": "reforma",
+    "country": "BR",
     "official": true,
     "priority": 2,
     "options": {
@@ -469,6 +482,7 @@
     "type": "html",
     "url": "https://reformatributaria.sefin.ro.gov.br/noticias",
     "category": "reforma",
+    "country": "BR",
     "official": true,
     "priority": 2,
     "options": {
@@ -483,6 +497,7 @@
     "type": "html",
     "url": "https://www.fazenda.mg.gov.br/noticias/{year}/",
     "category": "fiscal",
+    "country": "BR",
     "official": true,
     "priority": 2,
     "options": {
@@ -498,6 +513,7 @@
     "type": "rss",
     "url": "https://agenciabrasil.ebc.com.br/rss/economia/feed.xml",
     "category": "fiscal",
+    "country": "BR",
     "official": false,
     "priority": 1,
     "options": {
@@ -600,6 +616,7 @@
     "type": "rss",
     "url": "https://openai.com/news/rss.xml",
     "category": "ia",
+    "country": "US",
     "official": true,
     "priority": 3,
     "options": {}
@@ -610,6 +627,7 @@
     "type": "html",
     "url": "https://www.anthropic.com/news",
     "category": "ia",
+    "country": "US",
     "official": true,
     "priority": 3,
     "options": {
@@ -624,6 +642,7 @@
     "type": "rss",
     "url": "https://blog.google/technology/ai/rss/",
     "category": "ia",
+    "country": "US",
     "official": true,
     "priority": 2,
     "options": {}
@@ -634,6 +653,7 @@
     "type": "rss",
     "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
     "category": "ia",
+    "country": "US",
     "official": false,
     "priority": 1,
     "options": {}
@@ -719,6 +739,7 @@
     "type": "rss",
     "url": "https://devblogs.microsoft.com/dotnet/feed/",
     "category": "programacao",
+    "country": "US",
     "official": true,
     "priority": 3,
     "options": {}
@@ -729,6 +750,7 @@
     "type": "rss",
     "url": "https://devblogs.microsoft.com/feed/",
     "category": "programacao",
+    "country": "US",
     "official": true,
     "priority": 1,
     "options": {}
@@ -739,6 +761,7 @@
     "type": "rss",
     "url": "https://github.blog/feed/",
     "category": "programacao",
+    "country": "US",
     "official": true,
     "priority": 2,
     "options": {}
@@ -749,6 +772,7 @@
     "type": "rss",
     "url": "https://blog.python.org/feeds/posts/default?alt=rss",
     "category": "programacao",
+    "country": "US",
     "official": true,
     "priority": 2,
     "options": {}
@@ -759,6 +783,7 @@
     "type": "rss",
     "url": "https://developer.mozilla.org/en-US/blog/rss.xml",
     "category": "programacao",
+    "country": "US",
     "official": true,
     "priority": 1,
     "options": {}
@@ -769,6 +794,7 @@
     "type": "rss",
     "url": "https://blogs.embarcadero.com/feed/",
     "category": "programacao",
+    "country": "US",
     "official": true,
     "priority": 2,
     "options": {}
@@ -779,6 +805,7 @@
     "type": "html",
     "url": "https://firebirdsql.org/en/news/",
     "category": "programacao",
+    "country": "INT",
     "official": true,
     "priority": 2,
     "options": {
@@ -867,6 +894,7 @@
     "type": "rss",
     "url": "https://techcrunch.com/feed/",
     "category": "tecnologia",
+    "country": "US",
     "official": false,
     "priority": 1,
     "options": {}
@@ -877,6 +905,7 @@
     "type": "rss",
     "url": "https://www.theverge.com/rss/index.xml",
     "category": "tecnologia",
+    "country": "US",
     "official": false,
     "priority": 1,
     "options": {}
@@ -887,6 +916,7 @@
     "type": "rss",
     "url": "https://canaltech.com.br/rss/",
     "category": "tecnologia",
+    "country": "BR",
     "official": false,
     "priority": 2,
     "options": {}
@@ -897,6 +927,7 @@
     "type": "rss",
     "url": "https://tecnoblog.net/feed/",
     "category": "tecnologia",
+    "country": "BR",
     "official": false,
     "priority": 2,
     "options": {}
@@ -907,6 +938,7 @@
     "type": "rss",
     "url": "https://blog.google/rss/",
     "category": "tecnologia",
+    "country": "US",
     "official": true,
     "priority": 1,
     "options": {}
@@ -917,6 +949,7 @@
     "type": "rss",
     "url": "https://blogs.microsoft.com/feed/",
     "category": "tecnologia",
+    "country": "US",
     "official": true,
     "priority": 2,
     "options": {}
@@ -957,6 +990,7 @@
     "type": "rss",
     "url": "https://www.infomoney.com.br/feed/",
     "category": "mercado",
+    "country": "BR",
     "official": false,
     "priority": 1,
     "options": {
@@ -1044,6 +1078,7 @@
     "type": "rss",
     "url": "https://sourceforge.net/p/acbr/code/feed",
     "category": "acbr",
+    "country": "BR",
     "official": true,
     "priority": 2,
     "options": {

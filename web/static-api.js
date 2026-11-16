@@ -123,6 +123,7 @@
     if (p.to) { const to = p.to.length === 10 ? p.to + "T23:59:59Z" : p.to; pool = pool.filter((a) => a.published_at && a.published_at <= to); }
     if (p.min_relevance != null && p.min_relevance !== "") pool = pool.filter((a) => a.relevance >= Number(p.min_relevance));
     if (p.official != null && p.official !== "") { const o = p.official === true || p.official === "true" ? 1 : 0; pool = pool.filter((a) => Number(a.official) === o); }
+    if (p.brasil != null && p.brasil !== "") { const b = p.brasil === true || p.brasil === "true" || p.brasil === "1" ? 1 : 0; pool = pool.filter((a) => Number(a.brasil || 0) === b); }
     if (p.doc_type) pool = pool.filter((a) => a.doc_type === p.doc_type);
     if (p.legal_stage) pool = pool.filter((a) => a.legal_stage === p.legal_stage);
     if (p.erp != null && p.erp !== "") { const e = p.erp === true || p.erp === "true" || p.erp === "1" ? 1 : 0; pool = pool.filter((a) => Number(a.erp_impact || 0) === e); }

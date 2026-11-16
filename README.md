@@ -49,7 +49,9 @@ Como a coleta evita trabalho repetido:
  "official": true, "priority": 2, "options": {"link_pattern": "/noticias/[^/]+$", "limit": 15}}
 ```
 
-Opções úteis: `filter: "keywords"` aceita só itens cujo título tenha palavras-chave das abas (para fontes generalistas); `order: "last"` serve para listas em que o mais recente fica no fim; `date_from_text: true` lê a data no texto do ato normativo; `days` e `lang` (`pt` ou `en`) servem para as buscas.
+Opções úteis: `filter: "keywords"` aceita só itens cujo título tenha palavras-chave das abas (para fontes generalistas); `order: "last"` serve para listas em que o mais recente fica no fim; `date_from_text: true` lê a data no texto do ato normativo; `days` e `lang` (`pt` ou `en`) servem para as buscas; `country` (`"BR"` para fontes brasileiras, outro código para as estrangeiras) alimenta o filtro **Notícias Brasil**.
+
+**Filtro Notícias Brasil:** disponível em todas as categorias, mostra só notícias brasileiras e continua marcado ao trocar de aba. Uma notícia é brasileira quando o site do veículo termina em `.br`; senão vale o `country` da fonte; nas buscas (Google/Bing), sem país definido, conta o texto em português (sites de Portugal e de outros países lusófonos ficam de fora).
 
 Para conferir todas as fontes sem gravar nada: `.venv\Scripts\python.exe verificar_fontes.py`.
 
