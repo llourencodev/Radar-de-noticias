@@ -301,6 +301,9 @@ td.err { color: var(--bad); max-width: 360px; }
 .ev-org strong { color: var(--text-2); font-weight: 600; }
 .ev-card .summary { font-size: 13.5px; -webkit-line-clamp: 3; }
 .ev-card .card-foot { grid-column: 1 / -1; }
+.ev-card { grid-template-rows: auto 1fr auto; }
+.ev-thumb { grid-column: 1 / -1; aspect-ratio: 2 / 1; border-bottom: 1px solid var(--border); }
+.ev-thumb .noimg .outlet { font-size: 14px; }
 .badge.fmt.online { color: #0369a1; background: #e0f2fe; border-color: transparent; }
 .badge.fmt.presencial { color: #166534; background: #dcfce7; border-color: transparent; }
 .badge.fmt.hibrido { color: #6d28d9; background: #ede9fe; border-color: transparent; }

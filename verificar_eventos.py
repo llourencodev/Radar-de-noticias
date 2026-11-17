@@ -44,9 +44,16 @@ if __name__ == "__main__":
         kept = [e for e in (eventos.finalize(dict(r), src, cfg, today) for r in raw) if e]
         total_ok += bool(kept)
         fmts = Counter(e["format"] for e in kept)
-        print(f"{'OK ' if kept else '-- '} {src['id']:<24} lidos={len(raw):<4} mantidos={len(kept):<4} {dict(fmts)}")
+        imgs = sum(1 for e in kept if e.get("image"))
+        print(f"{'OK ' if kept else '-- '} {src['id']:<24} lidos={len(raw):<4} mantidos={len(kept):<4} com imagem={imgs:<4} {dict(fmts)}")
         for e in kept[:4]:
             print(f"      {e['start'][:16]} | {e['format']:<10} | {(e.get('city') or '-')[:18]:<18} | {','.join(e['themes'])[:30]:<30} | {e['title'][:70]}")
-        if (not raw or src['id'].startswith('luma')) and diag and src["type"] == "page":
+        if diag and kept and not imgs and src["type"] == "page":
+            import re
+            r = http.get(src["url"], max_bytes=6_000_000)
+            for key in ("featuredEventPhoto", "highResUrl", "PhotoInfo"):
+                for m in list(re.finditer(key, r.text))[:2]:
+                    print(f"      [{key}] ...{r.text[max(0, m.start() - 150):m.start() + 200]!r}...")
+        if not raw and diag and src["type"] == "page":
             diagnostico(src)
     print(f"\n{total_ok} de {len(sources)} fontes de eventos trouxeram eventos.")

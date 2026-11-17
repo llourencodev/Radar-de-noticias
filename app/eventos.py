@@ -25,6 +25,7 @@ from .processing.normalize import BRT, canonical_url, clean_text, detect_lang, n
 
 log = logging.getLogger("radar.eventos")
 EVENTS_FILE = config.CONFIG_DIR / "events.json"
+VERSION = 2                  # mude ao alterar a extração: força uma nova leitura de todas as fontes
 KEEP_PAST_DAYS = 30          # eventos encerrados há mais tempo saem do banco
 MAX_AHEAD_DAYS = 550         # ignora datas absurdamente distantes (erro de cadastro)
 _lock = threading.Lock()
@@ -36,6 +37,7 @@ CREATE TABLE IF NOT EXISTS events (
   description TEXT, tags TEXT, image TEXT, source_id TEXT, source_name TEXT, first_seen TEXT, last_seen TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_events_start ON events(start);
+CREATE TABLE IF NOT EXISTS events_meta (key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS event_sources (
   id TEXT PRIMARY KEY, last_run_at TEXT, next_run_at TEXT, status TEXT, error TEXT,
   failures INTEGER DEFAULT 0, found INTEGER DEFAULT 0, kept INTEGER DEFAULT 0
@@ -275,15 +277,23 @@ def _organizer(d: dict, parent: dict | None, refs: _Refs) -> str | None:
     return None
 
 
-def _image(d: dict, refs: _Refs) -> str | None:
-    for k in ("image", "cover_url", "image_url", "imageUrl", "logo", "featuredEventPhoto", "banner", "thumbnail"):
+IMG_KEYS = ("image", "images", "cover_url", "image_url", "imageUrl", "featuredEventPhoto", "displayPhoto", "eventPhoto",
+            "photo", "banner", "cover", "social_image_url", "thumbnail", "logo")
+# Sympla: images = {"original", "lg", "xs"}; Meetup: PhotoInfo = {"highResUrl", "standardUrl", "source"}
+IMG_SUBKEYS = ("lg", "highResUrl", "standardUrl", "source", "url", "original", "src", "md", "xs")
+
+
+def _image(d: dict, refs: _Refs, base: str = "") -> str | None:
+    for k in IMG_KEYS:
         v = refs.get_ref(d.get(k))
         if isinstance(v, list):
-            v = v[0] if v else None
+            v = refs.get_ref(v[0]) if v else None
         if isinstance(v, dict):
-            v = v.get("url") or v.get("highResUrl") or v.get("baseUrl") or v.get("original")
-        if isinstance(v, str) and v.startswith("http"):
-            return v
+            v = next((v[s] for s in IMG_SUBKEYS if isinstance(v.get(s), str) and v[s].startswith("http")), None)
+        if isinstance(v, str) and v.startswith("/") and not v.startswith("//") and base:
+            v = urljoin(base, v)
+        if isinstance(v, str) and v.startswith("http") and "/fallbacks/" not in v:
+            return v[:600]
     return None
 
 
@@ -329,7 +339,7 @@ def _from_obj(d: dict, parent: dict | None, refs: _Refs, base: str) -> dict | No
         "end_dt": end if end and end >= start else None, "end_all_day": end_all_day,
         "mode": loc["mode"], "city": loc["city"], "state": loc["state"], "country": loc["country"], "venue": loc["venue"],
         "organizer": _organizer(d, parent, refs), "description": _txt(desc)[:600], "tags": _txt(tags)[:300],
-        "image": _image(d, refs),
+        "image": _image(d, refs, base),
     }
 
 
@@ -338,16 +348,23 @@ def extract_events(blobs: list, base: str) -> list[dict]:
     refs = _Refs()
     for b in blobs:
         _collect_refs(b, refs)
-    out, seen = [], set()
+    out, seen = [], {}
 
     def walk(obj, parent=None, depth=0):
         if depth > 25:
             return
         if isinstance(obj, dict):
             ev = _from_obj(obj, parent, refs, base)
-            if ev and ev["url"] not in seen:
-                seen.add(ev["url"])
-                out.append(ev)
+            if ev:
+                key = canonical_url(ev["url"])
+                if key not in seen:
+                    seen[key] = ev
+                    out.append(ev)
+                else:  # o mesmo evento em outro bloco (ex.: JSON-LD + estado do Next.js): completa o que faltava
+                    first = seen[key]
+                    for k, v in ev.items():
+                        if v and not first.get(k):
+                            first[k] = v
             for k, v in obj.items():
                 if isinstance(v, dict) and set(v) == {"__ref"}:
                     continue
@@ -704,6 +721,12 @@ def collect(force: bool = False, only: list[str] | None = None) -> dict:
         init()
         cfg = load_config()
         states = source_states()
+        with db.session() as c:
+            row = c.execute("SELECT value FROM events_meta WHERE key='version'").fetchone()
+        if not row or row[0] != str(VERSION):
+            force = True  # extração nova (ex.: imagens): relê tudo já nesta execução
+            with db.WRITE_LOCK, db.session() as c:
+                c.execute("INSERT OR REPLACE INTO events_meta (key, value) VALUES ('version', ?)", (str(VERSION),))
         now = db.now_utc()
         today = now.astimezone(BRT).date()
         summary = {}
