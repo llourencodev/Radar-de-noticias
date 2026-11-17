@@ -381,7 +381,32 @@ def page_blobs(html: str) -> list:
             blobs.append(json.loads(raw))
         except ValueError:
             pass
+    blobs.extend(_rsc_blobs(html))
     return blobs
+
+
+RSC_RE = re.compile(r'self\.__next_f\.push\(\[1,\s*("(?:[^"\\]|\\.)*")\]\)', re.S)
+
+
+def _rsc_blobs(html: str) -> list:
+    """Sites em Next.js (app router, ex.: Sympla) mandam os dados em pedaços self.__next_f.push([1,"..."]):
+    junta os pedaços e lê cada linha "id:JSON"."""
+    parts = []
+    for lit in RSC_RE.findall(html):
+        try:
+            parts.append(json.loads(lit))
+        except ValueError:
+            pass
+    out = []
+    for line in "".join(parts).split("\n"):
+        m = re.match(r"^[0-9a-zA-Z]{1,6}:(?=[\[{])", line)
+        if not m:
+            continue
+        try:
+            out.append(json.loads(line[m.end():]))
+        except ValueError:
+            pass
+    return out
 
 
 # ---------------------------------------------------------------- coletores
