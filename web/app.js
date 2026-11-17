@@ -430,7 +430,7 @@
     $("#searchInput").value = q;
     view.innerHTML = `
       <div class="page-head"><div><div class="eyebrow" style="color:${EV.color}">Agenda</div><h1>${EV.name}</h1>
-      <p>Workshops, meetups, conferências, feiras e webinars de IA, programação, cibersegurança, dados, varejo, agro e inovação, online e presenciais. Coletados de agendas públicas (Eventbrite, Luma, Meetup, Sympla, dev.events, confs.tech); eventos encerrados somem sozinhos. Confirme datas e inscrições na página do evento.</p></div></div>
+      <p>Workshops, meetups, conferências, feiras e webinars de IA, programação, cibersegurança, dados, varejo, agro e inovação, online e presenciais. Coletados de agendas públicas (Sympla, Meetup, Luma, dev.events, confs.tech); eventos encerrados somem sozinhos. Confirme datas e inscrições na página do evento.</p></div></div>
       <form class="filters" id="evFilters">
         <div class="periods" role="radiogroup" aria-label="Tema">
           <span class="periods-label">Tema</span>

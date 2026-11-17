@@ -4,7 +4,7 @@ Os eventos vêm de fontes reais listadas em config/events.json:
   devevents  RSS do dev.events (conferências e meetups de desenvolvimento no mundo todo)
   confstech  base aberta do confs.tech (JSON no GitHub, com cidade, país e se é online)
   page       página de agenda com dados estruturados (schema.org/JSON-LD ou JSON embutido do site:
-             Eventbrite, Luma, Meetup, Sympla, dev.events...)
+             Sympla, Meetup, Luma, dev.events...)
   ical       agenda .ics (ex.: grupos do Meetup)
 Nada é inventado: só entram eventos com nome, data e link informados pela fonte. Eventos presenciais
 fora do Brasil ficam de fora; os online entram de qualquer país. Eventos já encerrados não são exibidos.
