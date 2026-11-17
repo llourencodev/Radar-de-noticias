@@ -1,6 +1,6 @@
 # Radar Inteligente de Notícias
 
-Central de notícias com coleta real e atualização automática, organizada em abas: Fiscal e Tributário, Reforma Tributária, Inteligência Artificial, Programação, Tecnologia, Mercado de TI e Todas as notícias.
+Central de notícias com coleta real e atualização automática, organizada em abas: Fiscal e Tributário, Reforma Tributária, Inteligência Artificial, Programação, Tecnologia, Mercado de TI e Todas as notícias, além da aba **Eventos de tecnologia**.
 
 ## Como executar no Windows
 
@@ -56,6 +56,19 @@ Opções úteis: `filter: "keywords"` aceita só itens cujo título tenha palavr
 Para conferir todas as fontes sem gravar nada: `.venv\Scripts\python.exe verificar_fontes.py`.
 
 As palavras-chave de cada aba ficam em `config/categories.json` e o glossário de termos técnicos fica em `config/glossary.json`.
+
+## Eventos de tecnologia
+
+A aba **Eventos de tecnologia** reúne workshops, meetups, conferências, feiras e webinars de IA, programação, cibersegurança, dados/cloud/DevOps, IA no comércio e varejo, agro/AgTech, indústria 4.0 e inovação, online e presenciais.
+
+- **Fontes reais** (em `config/events.json`): Sympla (tecnologia e negócios em SP, RJ e BH), Meetup (buscas por tecnologia, IA, programação, segurança e dados em SP, Rio, BH, Curitiba, Porto Alegre, Recife, Florianópolis, Brasília e Campinas, e a agenda .ics de grupos), Luma (São Paulo), dev.events (Brasil, meetups e feed mundial) e confs.tech (conferências internacionais).
+- **O que entra:** eventos no Brasil (presenciais ou híbridos) e eventos online de qualquer país. Presenciais no exterior ficam de fora. Fontes generalistas só trazem eventos com algum tema de tecnologia; festas, shows e similares são descartados.
+- **Cada evento mostra** nome, data e hora, formato (online, presencial, híbrido), cidade/UF e local, organizador, temas e o link da página do evento.
+- **Filtros:** tema, período (7 dias, 30 dias, 3 meses, todos), formato, estado, "Eventos Brasil" (no Brasil ou online em português) e busca por texto.
+- **Eventos encerrados somem sozinhos**, tanto na coleta quanto no navegador. Cursos longos que já começaram também não entram.
+- A coleta de eventos roda a cada 6 horas (`interval_min` em `config/events.json`), junto com a coleta de notícias. Uma fonte que falha não impede a publicação do site; a situação de cada fonte aparece em **Fontes e coleta**.
+- Para adicionar uma agenda: inclua um item em `config/events.json` com `type` `page` (página com dados estruturados schema.org ou JSON embutido), `ical` (agenda .ics) ou `devevents`. Para conferir todas as fontes sem gravar nada: `.venv\Scripts\python.exe verificar_eventos.py`.
+- O Eventbrite foi testado e bloqueia leitura automática (erro 405), por isso não está na lista.
 
 ## Inteligência artificial
 

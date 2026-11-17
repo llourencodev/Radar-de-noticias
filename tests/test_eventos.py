@@ -70,6 +70,25 @@ class TestExtracao(unittest.TestCase):
         festa = dict(base, title="Festa de fim de ano", start_dt=datetime(2026, 12, 10, tzinfo=timezone.utc))
         self.assertIsNone(eventos.finalize(festa, {"id": "c", "require_topic": True}, CFG, HOJE))
 
+    def test_titulo_online_e_curso_longo(self):
+        base = {"title": "IA aplicada aos empreendedores - Online", "url": "https://x.org", "city": "Belo Horizonte",
+                "start_dt": datetime(2026, 11, 23, 22, tzinfo=timezone.utc), "all_day": False, "end_dt": None,
+                "end_all_day": False, "mode": None}
+        self.assertEqual(eventos.finalize(dict(base), {"id": "s", "country": "BR"}, CFG, HOJE)["format"], "online")
+        curso = dict(base, start_dt=datetime(2026, 10, 1, tzinfo=timezone.utc), end_dt=datetime(2027, 2, 1, tzinfo=timezone.utc))
+        self.assertIsNone(eventos.finalize(curso, {"id": "s", "country": "BR"}, CFG, HOJE))
+
+    def test_data_meia_noite_utc_vira_dia(self):
+        dt, so_dia = eventos._date("2026-11-28T00:00:00.000Z")
+        self.assertTrue(so_dia)
+        self.assertEqual(eventos._iso(dt, so_dia), "2026-11-28")
+
+    def test_rsc_nextjs(self):
+        chunk = '1:{"items":[{"name":"Workshop de Python","start_date":"2026-12-01 19:00:00","url":"https://www.sympla.com.br/evento/x/1","location":{"city":"Recife","state":"PE"}}]}\n'
+        html = f'<script>self.__next_f.push([1,{json.dumps(chunk)}])</script>'
+        evs = eventos.extract_events(eventos.page_blobs(html), "https://www.sympla.com.br/eventos/tecnologia")
+        self.assertEqual((evs[0]["city"], evs[0]["state"]), ("Recife", "PE"))
+
     def test_devevents_descricao(self):
         i = eventos.parse_devevents_desc("Clean Architecture Masterclass is happening on December 10, 2026, Online.")
         self.assertEqual((i["mode"], i["start_dt"].day), ("online", 10))

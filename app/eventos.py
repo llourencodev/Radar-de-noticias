@@ -613,8 +613,11 @@ def finalize(raw: dict, src: dict, cfg: dict, today: date) -> dict | None:
         return None  # cursos longos já iniciados (turmas, trilhas) não são eventos a programar
     low = strip_accents(f"{ev['title']} {ev.get('venue') or ''}".lower())
     mode = ev.get("mode")
+    title_low = strip_accents(ev["title"].lower())
     if HYBRID_WORDS.search(low):
         mode = "hibrido"
+    elif re.search(r"\b(online|on-line|webinar|webinario)\b", title_low) and "presencial" not in title_low:
+        mode = "online"  # "Workshop X - Online": o título vale mais que o endereço cadastrado do produtor
     if not mode:
         if "/evento-online/" in ev["url"] or (ONLINE_WORDS.search(low) and not ev.get("city")):
             mode = "online"
