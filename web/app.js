@@ -22,6 +22,9 @@
     close: P('<path d="M6 6l12 12M18 6L6 18"/>'),
     calendar: P('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
     pin: P('<path d="M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>'),
+    shield: P('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>'),
+    cart: P('<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M3 4h2l2.4 11h11.2L21 7H6.2"/>'),
+    leaf: P('<path d="M5 19c0-8 5-14 15-15-1 10-7 15-15 15z"/><path d="M5 19l7-7"/>'),
     globe: P('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/>'),
     box: P('<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/>'),
     wrench: P('<path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.4-.4-2.4z"/>'),
@@ -116,6 +119,20 @@
     return S.events;
   }
   const themeOf = (slug) => (S.evThemes && S.evThemes[slug]) || { name: slug, color: "#64748b" };
+  const THEME_ICONS = { ia: "sparkles", programacao: "code", seguranca: "shield", "dados-cloud": "layers", varejo: "cart", agro: "leaf", industria: "cpu", negocios: "briefcase", geral: "calendar" };
+  // capa do evento (quando a fonte informa) ou um marcador com o ícone do tema, como nas notícias sem imagem
+  function evCover(e) {
+    const t = themeOf(e.themes[0]);
+    const ph = `<div class="noimg" style="--c:${t.color}">${icon(THEME_ICONS[e.themes[0]] || "calendar")}<span class="outlet">${esc(e.organizer || t.name)}</span><span class="note">${e.image ? "Imagem da fonte indisponível" : "Sem imagem na agenda de origem"}</span></div>`;
+    if (!e.image) return `<div class="thumb ev-thumb">${ph}</div>`;
+    return `<div class="thumb ev-thumb"><img src="${esc(safeUrl(e.image))}" alt="" loading="lazy" referrerpolicy="no-referrer" data-ev-fallback="1"><template>${ph}</template></div>`;
+  }
+  function fixEventImages(root) {
+    root.querySelectorAll("img[data-ev-fallback]").forEach((img) => img.addEventListener("error", () => {
+      const tpl = img.nextElementSibling; const host = img.parentElement;
+      img.remove(); if (tpl && tpl.tagName === "TEMPLATE") host.appendChild(tpl.content.cloneNode(true));
+    }, { once: true }));
+  }
   function evWhen(e) {
     const a = evDate(e.start), b = e.end ? evDate(e.end) : null;
     const d = (x) => x.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -137,6 +154,7 @@
     const a = evDate(e.start);
     const t0 = themeOf(e.themes[0]);
     return `<article class="ev-card" style="--c:${t0.color}">
+      ${evCover(e)}
       <div class="ev-date" aria-hidden="true"><span class="wd">${esc(fmtWeek.format(a).replace(".", ""))}</span><span class="dd">${esc(fmtDay.format(a))}</span><span class="mm">${esc(fmtMon.format(a).replace(".", ""))}</span></div>
       <div class="ev-body">
         <div class="badges"><span class="badge fmt ${esc(e.format)}">${esc(FORMATS[e.format] || e.format)}</span>${e.themes.slice(0, 3).map((t) => `<span class="badge cat" style="--c:${themeOf(t).color}">${esc(themeOf(t).name)}</span>`).join("")}</div>
@@ -297,6 +315,7 @@
         <div>${section("Programação", d.programacao, "#/c/programacao", "list")}</div>
       </div>`;
     fixImages(view);
+    fixEventImages(view);
   }
 
   // ------------------------------------------------------------ listas (abas)
@@ -484,6 +503,7 @@
       const title = fmtMonthYear.format(new Date(`${k}-15T12:00:00`));
       return `<section class="section"><div class="section-head"><h2>${esc(title.charAt(0).toUpperCase() + title.slice(1))}</h2><span class="hint">${evs.length} evento(s)</span></div><div class="ev-grid">${evs.map(eventCard).join("")}</div></section>`;
     }).join("");
+    fixEventImages(box);
   }
 
   // ------------------------------------------------------------ detalhe

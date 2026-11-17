@@ -275,15 +275,21 @@ def _organizer(d: dict, parent: dict | None, refs: _Refs) -> str | None:
     return None
 
 
+IMG_KEYS = ("image", "images", "cover_url", "image_url", "imageUrl", "featuredEventPhoto", "displayPhoto", "eventPhoto",
+            "photo", "banner", "cover", "social_image_url", "thumbnail", "logo")
+# Sympla: images = {"original", "lg", "xs"}; Meetup: PhotoInfo = {"highResUrl", "standardUrl", "source"}
+IMG_SUBKEYS = ("lg", "highResUrl", "standardUrl", "source", "url", "original", "src", "md", "xs")
+
+
 def _image(d: dict, refs: _Refs) -> str | None:
-    for k in ("image", "cover_url", "image_url", "imageUrl", "logo", "featuredEventPhoto", "banner", "thumbnail"):
+    for k in IMG_KEYS:
         v = refs.get_ref(d.get(k))
         if isinstance(v, list):
-            v = v[0] if v else None
+            v = refs.get_ref(v[0]) if v else None
         if isinstance(v, dict):
-            v = v.get("url") or v.get("highResUrl") or v.get("baseUrl") or v.get("original")
+            v = next((v[s] for s in IMG_SUBKEYS if isinstance(v.get(s), str) and v[s].startswith("http")), None)
         if isinstance(v, str) and v.startswith("http"):
-            return v
+            return v[:600]
     return None
 
 
