@@ -18,6 +18,10 @@ def diagnostico(src):
         blobs = eventos.page_blobs(r.text)
         print(f"      HTTP {r.status_code}, {len(r.text)} caracteres, {len(blobs)} bloco(s) JSON;"
               f" ld+json={r.text.count('application/ld+json')} next_data={'__NEXT_DATA__' in r.text}")
+        import re
+        for key in ("start_at", "startDate", "start_date", "dateTime", "startTime", "data_inicio", "/evento/"):
+            for m in list(re.finditer(re.escape(key), r.text))[:2]:
+                print(f"      [{key}] ...{r.text[max(0, m.start() - 300):m.start() + 200]!r}...")
     except Exception as ex:  # noqa: BLE001
         print(f"      diagnóstico falhou: {ex}")
 
@@ -43,6 +47,6 @@ if __name__ == "__main__":
         print(f"{'OK ' if kept else '-- '} {src['id']:<24} lidos={len(raw):<4} mantidos={len(kept):<4} {dict(fmts)}")
         for e in kept[:4]:
             print(f"      {e['start'][:16]} | {e['format']:<10} | {(e.get('city') or '-')[:18]:<18} | {','.join(e['themes'])[:30]:<30} | {e['title'][:70]}")
-        if not raw and diag and src["type"] == "page":
+        if (not raw or src['id'].startswith('luma')) and diag and src["type"] == "page":
             diagnostico(src)
     print(f"\n{total_ok} de {len(sources)} fontes de eventos trouxeram eventos.")

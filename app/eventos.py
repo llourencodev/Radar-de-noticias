@@ -125,7 +125,12 @@ def _date(v) -> tuple[datetime | None, bool]:
             return None, False
     if not isinstance(v, str):
         return None, False
-    dt, prec = parse_any_date(v.strip())
+    v = v.strip()
+    # "2026-12-03T00:00:00.000Z": várias agendas guardam só o dia como meia-noite UTC
+    m = re.match(r"^(\d{4}-\d{2}-\d{2})T00:00(?::00(?:\.0+)?)?(?:Z|[+-]00:?00)$", v)
+    if m:
+        v = m.group(1)
+    dt, prec = parse_any_date(v)
     return dt, prec == "date"
 
 
