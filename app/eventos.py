@@ -281,14 +281,16 @@ IMG_KEYS = ("image", "images", "cover_url", "image_url", "imageUrl", "featuredEv
 IMG_SUBKEYS = ("lg", "highResUrl", "standardUrl", "source", "url", "original", "src", "md", "xs")
 
 
-def _image(d: dict, refs: _Refs) -> str | None:
+def _image(d: dict, refs: _Refs, base: str = "") -> str | None:
     for k in IMG_KEYS:
         v = refs.get_ref(d.get(k))
         if isinstance(v, list):
             v = refs.get_ref(v[0]) if v else None
         if isinstance(v, dict):
             v = next((v[s] for s in IMG_SUBKEYS if isinstance(v.get(s), str) and v[s].startswith("http")), None)
-        if isinstance(v, str) and v.startswith("http"):
+        if isinstance(v, str) and v.startswith("/") and not v.startswith("//") and base:
+            v = urljoin(base, v)
+        if isinstance(v, str) and v.startswith("http") and "/fallbacks/" not in v:
             return v[:600]
     return None
 
@@ -335,7 +337,7 @@ def _from_obj(d: dict, parent: dict | None, refs: _Refs, base: str) -> dict | No
         "end_dt": end if end and end >= start else None, "end_all_day": end_all_day,
         "mode": loc["mode"], "city": loc["city"], "state": loc["state"], "country": loc["country"], "venue": loc["venue"],
         "organizer": _organizer(d, parent, refs), "description": _txt(desc)[:600], "tags": _txt(tags)[:300],
-        "image": _image(d, refs),
+        "image": _image(d, refs, base),
     }
 
 
@@ -344,16 +346,23 @@ def extract_events(blobs: list, base: str) -> list[dict]:
     refs = _Refs()
     for b in blobs:
         _collect_refs(b, refs)
-    out, seen = [], set()
+    out, seen = [], {}
 
     def walk(obj, parent=None, depth=0):
         if depth > 25:
             return
         if isinstance(obj, dict):
             ev = _from_obj(obj, parent, refs, base)
-            if ev and ev["url"] not in seen:
-                seen.add(ev["url"])
-                out.append(ev)
+            if ev:
+                key = canonical_url(ev["url"])
+                if key not in seen:
+                    seen[key] = ev
+                    out.append(ev)
+                else:  # o mesmo evento em outro bloco (ex.: JSON-LD + estado do Next.js): completa o que faltava
+                    first = seen[key]
+                    for k, v in ev.items():
+                        if v and not first.get(k):
+                            first[k] = v
             for k, v in obj.items():
                 if isinstance(v, dict) and set(v) == {"__ref"}:
                     continue

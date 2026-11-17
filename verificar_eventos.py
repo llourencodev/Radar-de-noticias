@@ -51,7 +51,7 @@ if __name__ == "__main__":
         if diag and kept and not imgs and src["type"] == "page":
             import re
             r = http.get(src["url"], max_bytes=6_000_000)
-            for key in ("hoto", "image", "cover"):
+            for key in ("featuredEventPhoto", "highResUrl", "PhotoInfo"):
                 for m in list(re.finditer(key, r.text))[:2]:
                     print(f"      [{key}] ...{r.text[max(0, m.start() - 150):m.start() + 200]!r}...")
         if not raw and diag and src["type"] == "page":
