@@ -25,6 +25,7 @@ from .processing.normalize import BRT, canonical_url, clean_text, detect_lang, n
 
 log = logging.getLogger("radar.eventos")
 EVENTS_FILE = config.CONFIG_DIR / "events.json"
+VERSION = 2                  # mude ao alterar a extração: força uma nova leitura de todas as fontes
 KEEP_PAST_DAYS = 30          # eventos encerrados há mais tempo saem do banco
 MAX_AHEAD_DAYS = 550         # ignora datas absurdamente distantes (erro de cadastro)
 _lock = threading.Lock()
@@ -36,6 +37,7 @@ CREATE TABLE IF NOT EXISTS events (
   description TEXT, tags TEXT, image TEXT, source_id TEXT, source_name TEXT, first_seen TEXT, last_seen TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_events_start ON events(start);
+CREATE TABLE IF NOT EXISTS events_meta (key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS event_sources (
   id TEXT PRIMARY KEY, last_run_at TEXT, next_run_at TEXT, status TEXT, error TEXT,
   failures INTEGER DEFAULT 0, found INTEGER DEFAULT 0, kept INTEGER DEFAULT 0
@@ -719,6 +721,12 @@ def collect(force: bool = False, only: list[str] | None = None) -> dict:
         init()
         cfg = load_config()
         states = source_states()
+        with db.session() as c:
+            row = c.execute("SELECT value FROM events_meta WHERE key='version'").fetchone()
+        if not row or row[0] != str(VERSION):
+            force = True  # extração nova (ex.: imagens): relê tudo já nesta execução
+            with db.WRITE_LOCK, db.session() as c:
+                c.execute("INSERT OR REPLACE INTO events_meta (key, value) VALUES ('version', ?)", (str(VERSION),))
         now = db.now_utc()
         today = now.astimezone(BRT).date()
         summary = {}
