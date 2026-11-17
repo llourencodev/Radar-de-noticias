@@ -20,6 +20,7 @@
     D.byId = new Map(D.all.map((a) => [a.id, a]));
     D.list = D.all.filter((a) => !a.is_duplicate);
     D.fontes = null;
+    D.events = null;
     D.stop = new Set(D.meta.stopwords || []);
     D.topics = new Set(D.meta.topic_terms || []);
     indexAll();
@@ -181,6 +182,7 @@
     return { ...clean(a), related };
   }
   async function fontes() { return (D.fontes ||= await getJSON("data/fontes.json")); }
+  async function events() { return (D.events ||= await getJSON("data/eventos.json")); }
 
   // verifica se o GitHub publicou uma coleta mais nova e, se sim, recarrega os dados
   async function checkNew() {
@@ -213,6 +215,7 @@
     }
     let m = route.match(/^articles\/(\d+)$/);
     if (m) return article(m[1]);
+    if (route === "events") return events();
     if (route === "sources") return (await fontes()).sources;
     if (route === "runs") return (await fontes()).runs.slice(0, Number(p.limit || 50));
     m = route.match(/^runs\/(\d+)$/);

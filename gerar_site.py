@@ -13,7 +13,7 @@ import sqlite3
 import sys
 from datetime import timedelta
 
-from app import config, db, scheduler, static_site
+from app import config, db, eventos, scheduler, static_site
 
 # fontes que vencem até 10 minutos depois desta execução já entram nela (o agendamento é de hora em hora)
 TOLERANCIA_MIN = 10
@@ -55,9 +55,13 @@ def main() -> None:
             log.info("%s fonte(s) vencida(s) para coletar", len(ids))
             if ids:
                 scheduler.run_cycle("agendado (GitHub)", force=True, only=ids)
+            try:  # eventos (aba Eventos): fontes vencidas, a cada 6 h; uma falha aqui não impede a publicação
+                eventos.collect()
+            except Exception:
+                log.exception("Falha na coleta de eventos (o site é publicado mesmo assim)")
         static_site.prune()
         info = static_site.export(config.BASE_DIR / args.saida)
-        log.info("Site gerado em %s: %s notícias", args.saida, info["articles"])
+        log.info("Site gerado em %s: %s notícias, %s eventos", args.saida, info["articles"], info["events"])
     finally:
         con = sqlite3.connect(config.DB_PATH)  # grava tudo no arquivo principal antes de guardar o banco
         con.execute("PRAGMA wal_checkpoint(TRUNCATE)")

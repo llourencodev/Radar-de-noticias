@@ -9,7 +9,7 @@ import shutil
 from datetime import timedelta
 from pathlib import Path
 
-from . import config, db
+from . import config, db, eventos
 from .processing import llm
 from .processing.legal import STAGE_LABELS
 from .processing.normalize import STOPWORDS
@@ -119,8 +119,10 @@ def export(out_dir: Path) -> dict:
     for r in runs[:20]:
         r["logs"] = db.run_logs(r["id"])
     _write(out_dir / "data" / "fontes.json", {"generated_at": generated, "sources": public_sources, "runs": runs})
+    ev = eventos.upcoming()
+    _write(out_dir / "data" / "eventos.json", ev)
     _write(out_dir / "data" / "status.json", {"generated_at": generated})
-    return {"articles": len(articles), "generated_at": generated}
+    return {"articles": len(articles), "events": len(ev["events"]), "generated_at": generated}
 
 
 def _write(path: Path, data) -> None:

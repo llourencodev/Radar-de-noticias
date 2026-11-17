@@ -8,7 +8,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
-from . import config, db
+from . import config, db, eventos
 from .collectors import html as html_collector
 from .collectors import rss, search
 from .collectors.base import FetchResult, RawItem
@@ -357,6 +357,7 @@ def scheduler_loop(stop: threading.Event) -> None:
         try:
             if config.AUTO_UPDATE and (not first or config.COLLECT_ON_START):
                 run_cycle("automatico" if not first else "inicial")
+                eventos.collect()  # só as fontes de eventos vencidas (a cada 6 h, por padrão)
         except Exception:
             log.exception("Erro no agendador")
         first = False
