@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, db, scheduler
+from . import config, db, eventos, scheduler
 from .collectors import html as html_collector
 from .collectors import rss, search
 from .processing import llm
@@ -22,6 +22,7 @@ _stop = threading.Event()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
+    eventos.init()
     t = threading.Thread(target=scheduler.scheduler_loop, args=(_stop,), daemon=True, name="agendador")
     t.start()
     yield
@@ -68,6 +69,18 @@ def meta():
         "llm": llm.provider_name(),
         "interval_min": config.INTERVAL_MIN,
     }
+
+
+# ---------------------------------------------------------------- eventos
+@app.get("/api/events")
+def events():
+    return eventos.upcoming()
+
+
+@app.post("/api/events/refresh")
+def events_refresh():
+    threading.Thread(target=eventos.collect, kwargs={"force": True}, daemon=True).start()
+    return {"started": True}
 
 
 # ---------------------------------------------------------------- coleta
