@@ -606,8 +606,11 @@ def finalize(raw: dict, src: dict, cfg: dict, today: date) -> dict | None:
         return None
     start, end = ev.pop("start_dt"), ev.pop("end_dt", None)
     last_day = (end or start).astimezone(BRT).date()
-    if last_day < today or start.astimezone(BRT).date() > today + timedelta(days=MAX_AHEAD_DAYS):
+    first_day = start.astimezone(BRT).date()
+    if last_day < today or first_day > today + timedelta(days=MAX_AHEAD_DAYS):
         return None
+    if first_day < today - timedelta(days=7) or (first_day < today and (last_day - first_day).days > 14):
+        return None  # cursos longos já iniciados (turmas, trilhas) não são eventos a programar
     low = strip_accents(f"{ev['title']} {ev.get('venue') or ''}".lower())
     mode = ev.get("mode")
     if HYBRID_WORDS.search(low):
