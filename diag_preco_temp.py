@@ -1,42 +1,43 @@
-"""Temporário: mostra como cada fonte informa preço/gratuidade e certificado."""
-import json, re, sys
+"""Temporário: preço e certificado nas páginas de cada evento."""
+import json, re
 from app import eventos, http
 
-URLS = ["https://www.sympla.com.br/eventos/tecnologia", "https://luma.com/sao-paulo",
-        "https://www.meetup.com/find/?keywords=tecnologia&location=br--S%C3%A3o%20Paulo",
-        "https://dev.events/SA/BR", "https://www.meetup.com/aidev-saopaulo/events/ical/"]
-KEY = re.compile(r"price|free|fee|ticket|offer|gratu|pago|paid|cost|valor|certif", re.I)
+def show(t, words, n=2, w=200):
+    for x in words:
+        for m in list(re.finditer(x, t))[:n]:
+            print(f"  [{x}]", repr(t[max(0, m.start()-w):m.start()+w]))
 
-def walk(o, path, out, depth=0):
-    if depth > 20: return
+# 1) Sympla: chaves de um evento da listagem e link "Grátis"
+r = http.get("https://www.sympla.com.br/eventos/tecnologia", max_bytes=6_000_000)
+t = r.text
+for m in re.finditer(r'href="([^"]+)"[^>]*>Grátis<', t): print("link gratis:", m.group(1))
+for m in re.finditer(r'href="([^"]+)"[^>]*>Pago<', t): print("link pago:", m.group(1))
+blobs = eventos.page_blobs(t)
+found = []
+def walk(o, d=0):
+    if d > 25 or len(found) > 1: return
     if isinstance(o, dict):
-        for k, v in o.items():
-            if KEY.search(str(k)):
-                s = json.dumps(v, ensure_ascii=False)[:200]
-                out.setdefault(f"{path}.{k}" if len(path) < 1 else re.sub(r"\[\d+\]", "[]", f"{path}.{k}"), []).append(s)
-            walk(v, f"{path}.{k}", out, depth + 1)
+        if eventos._from_obj(o, None, eventos._Refs(), "https://www.sympla.com.br/"):
+            found.append(o); return
+        for v in o.values(): walk(v, d+1)
     elif isinstance(o, list):
-        for i, v in enumerate(o[:40]): walk(v, f"{path}[{i}]", out, depth + 1)
-
-for u in URLS:
-    print("=" * 20, u)
+        for v in o: walk(v, d+1)
+for b in blobs: walk(b)
+for o in found: print("SYMPLA OBJ:", json.dumps(o, ensure_ascii=False)[:2500])
+evs = eventos.extract_events(blobs, str(r.url))
+urls = [e["url"] for e in evs[:6]]
+# 2) páginas de eventos
+lu = eventos.extract_events(eventos.page_blobs(http.get("https://luma.com/sao-paulo", max_bytes=6_000_000).text), "https://luma.com/")
+mu = eventos.extract_events(eventos.page_blobs(http.get("https://www.meetup.com/find/?keywords=tecnologia&location=br--S%C3%A3o%20Paulo", max_bytes=6_000_000).text), "https://www.meetup.com/")
+for u in urls[:4] + [e["url"] for e in lu[:2]] + [e["url"] for e in mu[:2]]:
+    print("=" * 10, u)
     try:
-        r = http.get(u, max_bytes=6_000_000)
-    except Exception as e:
-        print("erro", e); continue
-    t = r.text
-    print("HTTP", r.status_code, len(t))
-    if "ical" in u:
-        for w in ("certific", "gratu", "free", "R$"):
-            for m in list(re.finditer(w, t, re.I))[:3]: print(f"  [{w}]", repr(t[max(0, m.start()-120):m.start()+120]))
-        continue
-    blobs = eventos.page_blobs(t)
-    out = {}
-    for i, b in enumerate(blobs): walk(b, f"b{i}", out)
-    for k, v in list(out.items())[:60]:
-        print(f"  {k}  ({len(v)}x)  ex: {v[:3]}")
-    evs = eventos.extract_events(blobs, str(r.url))
-    print("  eventos:", len(evs), "| com 'certific' na descrição:", sum("certific" in (e['description'] or '').lower() for e in evs),
-          "| com 'grat' na descrição/título:", sum("grat" in ((e['description'] or '') + e['title']).lower() for e in evs))
-    for w in ("certificado", "certificate", "Gratuito", "Grátis", "isFree", "is_free"):
-        for m in list(re.finditer(w, t))[:2]: print(f"  [{w}]", repr(t[max(0, m.start()-150):m.start()+150]))
+        p = http.get(u, max_bytes=6_000_000)
+    except Exception as ex:
+        print("erro", ex); continue
+    pt = p.text
+    print("HTTP", p.status_code, len(pt))
+    pe = eventos.extract_events(eventos.page_blobs(pt), str(p.url))
+    me = [e for e in pe if eventos.canonical_url(e["url"]) == eventos.canonical_url(u)] or pe[:1]
+    if me: print("  desc extraída:", len(me[0]["description"]), repr(me[0]["description"][:300]))
+    show(pt, ["certificad", "Certificad", "isAccessibleForFree", '"price"', "lowPrice", "is_free", "feeSettings", "Gratuito", "Grátis", "R\\$ ?\\d"], n=2, w=160)
