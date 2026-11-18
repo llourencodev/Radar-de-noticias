@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timezone
 
 from app.collectors import rss
-from app.processing import classify, dedup, erp, legal, summarize
+from app.processing import classify, dedup, erp, legal, origin, summarize
 from app.processing.normalize import canonical_url, fts_query, norm_title, parse_any_date, parse_pt_date
 
 
@@ -35,6 +35,18 @@ class TestClassificacao(unittest.TestCase):
         self.assertIn("reforma", cats)
         cats = [c[0] for c in classify.classify("Anthropic lança novo modelo Claude", "", None, "rss")]
         self.assertEqual(cats[0], "ia")
+
+    def test_politica_fiscal_entra_em_fiscal(self):
+        # fontes com filter=keywords (Agência Senado, Câmara, Agência Brasil) só olham o título
+        for titulo in ["Senado aprova texto-base do ajuste fiscal com impacto de até R$ 56,1 bi",
+                       "Câmara aprova pacote de corte de gastos",
+                       "Governo propõe mudança no arcabouço fiscal",
+                       "Haddad diz que meta fiscal será cumprida"]:
+            cats = classify.classify(titulo, "", None, "rss", require_title=True)
+            self.assertIn("fiscal", [c[0] for c in cats], titulo)
+        cats = classify.classify("Apple lança iPhone com orçamento recorde de marketing", "", None, "rss",
+                                 require_title=True)
+        self.assertNotIn("fiscal", [c[0] for c in cats])
 
     def test_oficial(self):
         self.assertTrue(classify.is_official("gov.br", False))
@@ -137,3 +149,17 @@ class TestContadorAcessos(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOrigemBrasil(unittest.TestCase):
+    def test_noticias_brasil(self):
+        self.assertTrue(origin.is_brazilian("g1.globo.com.br", "pt"))
+        self.assertTrue(origin.is_brazilian("gov.br", "?", None))
+        self.assertTrue(origin.is_brazilian("jota.info", "pt", "jota"))              # fonte marcada BR
+        self.assertTrue(origin.is_brazilian("exame.com", "pt", "busca-ia-bing"))     # busca: texto em português
+        self.assertTrue(origin.is_brazilian("sourceforge.net", "en", "acbr-svn"))    # Projeto ACBr é brasileiro
+        self.assertFalse(origin.is_brazilian("techcrunch.com", "en", "techcrunch"))
+        self.assertFalse(origin.is_brazilian("openai.com", "pt", "openai"))          # fonte estrangeira
+        self.assertFalse(origin.is_brazilian("publico.pt", "pt", "busca-ia-bing"))   # Portugal
+        self.assertFalse(origin.is_brazilian("theverge.com", "en", "busca-ia-modelos"))
+        self.assertFalse(origin.is_brazilian(None, "?", None))

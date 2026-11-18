@@ -1,6 +1,6 @@
 # Radar Inteligente de Notícias
 
-Central de notícias com coleta real e atualização automática, organizada em abas: Fiscal e Tributário, Reforma Tributária, Inteligência Artificial, Programação, Tecnologia, Mercado de TI e Todas as notícias.
+Central de notícias com coleta real e atualização automática, organizada em abas: Fiscal e Tributário, Reforma Tributária, Inteligência Artificial, Programação, Tecnologia, Mercado de TI e Todas as notícias, além da aba **Eventos de tecnologia**.
 
 ## Como executar no Windows
 
@@ -49,11 +49,27 @@ Como a coleta evita trabalho repetido:
  "official": true, "priority": 2, "options": {"link_pattern": "/noticias/[^/]+$", "limit": 15}}
 ```
 
-Opções úteis: `filter: "keywords"` aceita só itens cujo título tenha palavras-chave das abas (para fontes generalistas); `order: "last"` serve para listas em que o mais recente fica no fim; `date_from_text: true` lê a data no texto do ato normativo; `days` e `lang` (`pt` ou `en`) servem para as buscas.
+Opções úteis: `filter: "keywords"` aceita só itens cujo título tenha palavras-chave das abas (para fontes generalistas); `order: "last"` serve para listas em que o mais recente fica no fim; `date_from_text: true` lê a data no texto do ato normativo; `days` e `lang` (`pt` ou `en`) servem para as buscas; `country` (`"BR"` para fontes brasileiras, outro código para as estrangeiras) alimenta o filtro **Notícias Brasil**.
+
+**Filtro Notícias Brasil:** disponível em todas as categorias, mostra só notícias brasileiras e continua marcado ao trocar de aba. Uma notícia é brasileira quando o site do veículo termina em `.br`; senão vale o `country` da fonte; nas buscas (Google/Bing), sem país definido, conta o texto em português (sites de Portugal e de outros países lusófonos ficam de fora).
 
 Para conferir todas as fontes sem gravar nada: `.venv\Scripts\python.exe verificar_fontes.py`.
 
 As palavras-chave de cada aba ficam em `config/categories.json` e o glossário de termos técnicos fica em `config/glossary.json`.
+
+## Eventos de tecnologia
+
+A aba **Eventos de tecnologia** reúne workshops, meetups, conferências, feiras e webinars de IA, programação, cibersegurança, dados/cloud/DevOps, IA no comércio e varejo, agro/AgTech, indústria 4.0 e inovação, online e presenciais.
+
+- **Fontes reais** (em `config/events.json`): Sympla (tecnologia e negócios em SP, RJ e BH), Meetup (buscas por tecnologia, IA, programação, segurança e dados em SP, Rio, BH, Curitiba, Porto Alegre, Recife, Florianópolis, Brasília e Campinas, e a agenda .ics de grupos), Luma (São Paulo), dev.events (Brasil, meetups e feed mundial) e confs.tech (conferências internacionais).
+- **O que entra:** eventos no Brasil (presenciais ou híbridos) e eventos online de qualquer país. Presenciais no exterior ficam de fora. Fontes generalistas só trazem eventos com algum tema de tecnologia; festas, shows e similares são descartados.
+- **Cada evento mostra** nome, data e hora, formato (online, presencial, híbrido), cidade/UF e local, organizador, temas e o link da página do evento.
+- **Filtros:** tema, período (7 dias, 30 dias, 3 meses, todos), formato, estado, "Eventos Brasil" (no Brasil ou online em português), "Grátis", "Com certificado" e busca por texto.
+- **Grátis e Com certificado:** um evento é marcado como grátis quando a fonte informa preço zero (Luma, Meetup sem taxa, schema.org `offers`/`isAccessibleForFree`), quando vem da seção Grátis da Sympla (`mark_free`) ou quando o título/descrição diz "gratuito", "entrada franca" etc. "Com certificado" vale quando a descrição menciona emissão de certificado (certificado de participação/conclusão; "certificado digital" não conta). Para isso, nas fontes com `"details": true`, a página de cada evento novo é aberta uma vez (até 60 por execução). Eventos cuja fonte não informa preço ficam fora do filtro "Grátis".
+- **Eventos encerrados somem sozinhos**, tanto na coleta quanto no navegador. Cursos longos que já começaram também não entram.
+- A coleta de eventos roda a cada 6 horas (`interval_min` em `config/events.json`), junto com a coleta de notícias. Uma fonte que falha não impede a publicação do site; a situação de cada fonte aparece em **Fontes e coleta**.
+- Para adicionar uma agenda: inclua um item em `config/events.json` com `type` `page` (página com dados estruturados schema.org ou JSON embutido), `ical` (agenda .ics) ou `devevents`. Para conferir todas as fontes sem gravar nada: `.venv\Scripts\python.exe verificar_eventos.py`.
+- O Eventbrite foi testado e bloqueia leitura automática (erro 405), por isso não está na lista.
 
 ## Inteligência artificial
 

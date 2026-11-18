@@ -20,6 +20,7 @@
     D.byId = new Map(D.all.map((a) => [a.id, a]));
     D.list = D.all.filter((a) => !a.is_duplicate);
     D.fontes = null;
+    D.events = null;
     D.stop = new Set(D.meta.stopwords || []);
     D.topics = new Set(D.meta.topic_terms || []);
     indexAll();
@@ -123,6 +124,7 @@
     if (p.to) { const to = p.to.length === 10 ? p.to + "T23:59:59Z" : p.to; pool = pool.filter((a) => a.published_at && a.published_at <= to); }
     if (p.min_relevance != null && p.min_relevance !== "") pool = pool.filter((a) => a.relevance >= Number(p.min_relevance));
     if (p.official != null && p.official !== "") { const o = p.official === true || p.official === "true" ? 1 : 0; pool = pool.filter((a) => Number(a.official) === o); }
+    if (p.brasil != null && p.brasil !== "") { const b = p.brasil === true || p.brasil === "true" || p.brasil === "1" ? 1 : 0; pool = pool.filter((a) => Number(a.brasil || 0) === b); }
     if (p.doc_type) pool = pool.filter((a) => a.doc_type === p.doc_type);
     if (p.legal_stage) pool = pool.filter((a) => a.legal_stage === p.legal_stage);
     if (p.erp != null && p.erp !== "") { const e = p.erp === true || p.erp === "true" || p.erp === "1" ? 1 : 0; pool = pool.filter((a) => Number(a.erp_impact || 0) === e); }
@@ -180,6 +182,7 @@
     return { ...clean(a), related };
   }
   async function fontes() { return (D.fontes ||= await getJSON("data/fontes.json")); }
+  async function events() { return (D.events ||= await getJSON("data/eventos.json")); }
 
   // verifica se o GitHub publicou uma coleta mais nova e, se sim, recarrega os dados
   async function checkNew() {
@@ -212,6 +215,7 @@
     }
     let m = route.match(/^articles\/(\d+)$/);
     if (m) return article(m[1]);
+    if (route === "events") return events();
     if (route === "sources") return (await fontes()).sources;
     if (route === "runs") return (await fontes()).runs.slice(0, Number(p.limit || 50));
     m = route.match(/^runs\/(\d+)$/);

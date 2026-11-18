@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import config, db, scheduler
+from . import config, db, eventos, scheduler
 from .collectors import html as html_collector
 from .collectors import rss, search
 from .processing import llm
@@ -22,6 +22,7 @@ _stop = threading.Event()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
+    eventos.init()
     t = threading.Thread(target=scheduler.scheduler_loop, args=(_stop,), daemon=True, name="agendador")
     t.start()
     yield
@@ -38,9 +39,9 @@ def articles(q: str = "", category: str | None = None, source: str | None = None
              min_relevance: float | None = None, official: bool | None = None, doc_type: str | None = None,
              legal_stage: str | None = None, sort: str = "auto", limit: int = Query(30, le=100),
              offset: int = 0, include_duplicates: bool = False, erp: bool | None = None,
-             erp_doc: str | None = None):
+             erp_doc: str | None = None, brasil: bool | None = None):
     return db.search_articles(q, category, source, date_from, date_to, min_relevance, official, doc_type,
-                              legal_stage, sort, limit, offset, include_duplicates, erp, erp_doc)
+                              legal_stage, sort, limit, offset, include_duplicates, erp, erp_doc, brasil)
 
 
 @app.get("/api/articles/{aid}")
@@ -68,6 +69,18 @@ def meta():
         "llm": llm.provider_name(),
         "interval_min": config.INTERVAL_MIN,
     }
+
+
+# ---------------------------------------------------------------- eventos
+@app.get("/api/events")
+def events():
+    return eventos.upcoming()
+
+
+@app.post("/api/events/refresh")
+def events_refresh():
+    threading.Thread(target=eventos.collect, kwargs={"force": True}, daemon=True).start()
+    return {"started": True}
 
 
 # ---------------------------------------------------------------- coleta

@@ -20,6 +20,12 @@
     menu: P('<path d="M4 6h16M4 12h16M4 18h16"/>'),
     external: P('<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>'),
     close: P('<path d="M6 6l12 12M18 6L6 18"/>'),
+    calendar: P('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'),
+    pin: P('<path d="M12 21s-7-6.2-7-11a7 7 0 0114 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>'),
+    shield: P('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>'),
+    cart: P('<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M3 4h2l2.4 11h11.2L21 7H6.2"/>'),
+    leaf: P('<path d="M5 19c0-8 5-14 15-15-1 10-7 15-15 15z"/><path d="M5 19l7-7"/>'),
+    globe: P('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/>'),
     box: P('<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/>'),
     wrench: P('<path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.4-.4-2.4z"/>'),
   };
@@ -85,6 +91,81 @@
   const ERP = { name: "Notas técnicas e ajustes em ERP", short: "Notas técnicas / ERP", color: "#c2410c" };
   const ERP_DOCS = ["NF-e", "NFC-e", "NFS-e", "CT-e", "MDF-e", "NF3e/NFCom", "BP-e/GNRE", "SPED/EFD", "EFD-Reinf", "eSocial", "DCTFWeb", "IBS/CBS", "Documentos fiscais"];
   const erpBadge = (a) => (a.erp_impact ? `<span class="badge erp" title="${esc(a.erp_reason || "Pode exigir ajuste em sistemas")} — classificação automática">Ajuste em ERP${(a.erp_docs || []).length ? ` · ${esc(a.erp_docs.join(", "))}` : ""}</span>` : "");
+
+  // ------------------------------------------------------------ eventos (workshops, meetups, conferências, feiras, webinars)
+  const EV = { name: "Eventos de tecnologia", color: "#7c3aed" };
+  const FORMATS = { online: "Online", presencial: "Presencial", hibrido: "Híbrido", nao_informado: "Formato não informado" };
+  const fmtDay = new Intl.DateTimeFormat("pt-BR", { day: "2-digit" });
+  const fmtMon = new Intl.DateTimeFormat("pt-BR", { month: "short" });
+  const fmtWeek = new Intl.DateTimeFormat("pt-BR", { weekday: "short" });
+  const fmtMonthYear = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
+  const fmtHour = new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  // datas de evento: AAAA-MM-DD (só o dia) ou ISO UTC com hora
+  const evDate = (s) => (s && s.length === 10 ? new Date(`${s}T12:00:00`) : new Date(s));
+  const localDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const evLastDay = (e) => localDay(evDate(e.end || e.start));
+  // esconde o que já terminou, mesmo que a página esteja aberta há dias
+  const upcomingEvents = () => ((S.events && S.events.events) || []).filter((e) => evLastDay(e) >= localDay(new Date()));
+  // painel: os 6 próximos que ainda vão começar, primeiro os do Brasil
+  function nextEvents() {
+    const today = localDay(new Date());
+    const fut = upcomingEvents().filter((e) => localDay(evDate(e.start)) >= today);
+    const br = fut.filter((e) => e.scope === "brasil");
+    return [...br, ...fut.filter((e) => e.scope !== "brasil")].slice(0, 6).sort((a, b) => evDate(a.start) - evDate(b.start));
+  }
+  async function loadEvents(force = false) {
+    if (!S.events || force) S.events = await api("/api/events");
+    S.evThemes = Object.fromEntries((S.events.themes || []).map((t) => [t.slug, t]));
+    return S.events;
+  }
+  const themeOf = (slug) => (S.evThemes && S.evThemes[slug]) || { name: slug, color: "#64748b" };
+  const THEME_ICONS = { ia: "sparkles", programacao: "code", seguranca: "shield", "dados-cloud": "layers", varejo: "cart", agro: "leaf", industria: "cpu", negocios: "briefcase", geral: "calendar" };
+  // capa do evento (quando a fonte informa) ou um marcador com o ícone do tema, como nas notícias sem imagem
+  function evCover(e) {
+    const t = themeOf(e.themes[0]);
+    const ph = `<div class="noimg" style="--c:${t.color}">${icon(THEME_ICONS[e.themes[0]] || "calendar")}<span class="outlet">${esc(e.organizer || t.name)}</span><span class="note">${e.image ? "Imagem da fonte indisponível" : "Sem imagem na agenda de origem"}</span></div>`;
+    if (!e.image) return `<div class="thumb ev-thumb">${ph}</div>`;
+    return `<div class="thumb ev-thumb"><img src="${esc(safeUrl(e.image))}" alt="" loading="lazy" referrerpolicy="no-referrer" data-ev-fallback="1"><template>${ph}</template></div>`;
+  }
+  function fixEventImages(root) {
+    root.querySelectorAll("img[data-ev-fallback]").forEach((img) => img.addEventListener("error", () => {
+      const tpl = img.nextElementSibling; const host = img.parentElement;
+      img.remove(); if (tpl && tpl.tagName === "TEMPLATE") host.appendChild(tpl.content.cloneNode(true));
+    }, { once: true }));
+  }
+  function evWhen(e) {
+    const a = evDate(e.start), b = e.end ? evDate(e.end) : null;
+    const d = (x) => x.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+    let txt = d(a);
+    if (b && localDay(b) !== localDay(a)) txt = `${d(a)} a ${d(b)}`;
+    if (e.start.length > 10) txt += ` · ${fmtHour.format(a)}${b && localDay(b) === localDay(a) && e.end.length > 10 ? `–${fmtHour.format(b)}` : ""}`;
+    const days = Math.round((new Date(localDay(a) + "T00:00:00") - new Date(localDay(new Date()) + "T00:00:00")) / 86400000);
+    const rel = days < 0 ? "em andamento" : days === 0 ? "hoje" : days === 1 ? "amanhã" : days < 7 ? `em ${days} dias` : "";
+    return `<time datetime="${esc(e.start)}">${esc(txt)}</time>${rel ? ` <span class="ev-rel">${rel}</span>` : ""}`;
+  }
+  function evWhere(e) {
+    const place = [e.city, e.state].filter(Boolean).join(" - ") || (e.country && e.country !== "BR" ? e.country : "");
+    if (e.format === "online") return `${icon("globe")}<span>Online${e.scope === "internacional" ? " · internacional" : ""}</span>`;
+    if (e.format === "hibrido") return `${icon("pin")}<span>Híbrido${place ? ` · ${esc(place)}` : ""}${e.venue ? ` · ${esc(e.venue)}` : ""}</span>`;
+    if (e.format === "presencial") return `${icon("pin")}<span>${esc(place || "Presencial")}${e.venue && e.venue !== place ? ` · ${esc(e.venue)}` : ""}</span>`;
+    return `${icon("pin")}<span>${esc(place || "Local não informado pela fonte")}</span>`;
+  }
+  function eventCard(e) {
+    const a = evDate(e.start);
+    const t0 = themeOf(e.themes[0]);
+    return `<article class="ev-card" style="--c:${t0.color}">
+      ${evCover(e)}
+      <div class="ev-date" aria-hidden="true"><span class="wd">${esc(fmtWeek.format(a).replace(".", ""))}</span><span class="dd">${esc(fmtDay.format(a))}</span><span class="mm">${esc(fmtMon.format(a).replace(".", ""))}</span></div>
+      <div class="ev-body">
+        <div class="badges"><span class="badge fmt ${esc(e.format)}">${esc(FORMATS[e.format] || e.format)}</span>${e.free ? `<span class="badge ev-free">Grátis</span>` : ""}${e.certificate ? `<span class="badge ev-cert">Com certificado</span>` : ""}${e.themes.slice(0, 3).map((t) => `<span class="badge cat" style="--c:${themeOf(t).color}">${esc(themeOf(t).name)}</span>`).join("")}</div>
+        <h3><a href="${esc(safeUrl(e.url))}" target="_blank" rel="noopener noreferrer">${esc(e.title)}</a></h3>
+        <div class="ev-meta"><span class="ev-when">${icon("calendar")}${evWhen(e)}</span><span class="ev-where">${evWhere(e)}</span></div>
+        ${e.organizer ? `<div class="ev-org">Organização: <strong>${esc(e.organizer)}</strong></div>` : ""}
+        ${e.description ? `<p class="summary">${esc(e.description)}</p>` : ""}
+      </div>
+      <div class="card-foot"><span class="hint">Fonte: ${esc(e.source)}</span><a href="${esc(safeUrl(e.url))}" target="_blank" rel="noopener noreferrer">Página do evento ${icon("external")}</a></div>
+    </article>`;
+  }
 
   // ------------------------------------------------------------ componentes
   function catOf(slug) { return S.cats[slug] || { name: slug, color: "#64748b", icon: "layers" }; }
@@ -169,6 +250,7 @@
     });
     items.push(`<div class="nav-label">Destaques</div>`);
     items.push(`<a class="nav-item" href="#/erp" data-route="erp" style="--c:${ERP.color}">${icon("wrench")}<span>${ERP.short}</span><span class="count">${S.dash && S.dash.erp_total != null ? S.dash.erp_total : ""}</span></a>`);
+    items.push(`<a class="nav-item" href="#/eventos" data-route="eventos" style="--c:${EV.color}">${icon("calendar")}<span>${EV.name}</span><span class="count">${S.events ? upcomingEvents().length : ""}</span></a>`);
     items.push(`<a class="nav-item" href="#/todas" data-route="todas">${icon("layers")}<span>Todas as notícias</span><span class="count">${S.dash ? S.dash.total : ""}</span></a>`);
     $("#nav").innerHTML = items.join("");
     markActive();
@@ -193,6 +275,7 @@
       else if (path.startsWith("c/")) await viewList(view, path.slice(2), params);
       else if (path === "todas") await viewList(view, "todas", params);
       else if (path === "erp") await viewList(view, "erp", params);
+      else if (path === "eventos") await viewEvents(view, params);
       else if (path === "fontes") await viewSources(view);
       else await viewDashboard(view);
     } catch (e) {
@@ -204,7 +287,7 @@
 
   // ------------------------------------------------------------ painel
   async function viewDashboard(view) {
-    const d = await api("/api/dashboard");
+    const [d] = await Promise.all([api("/api/dashboard"), loadEvents().catch(() => null)]);
     S.dash = d; renderNav();
     const st = d.status;
     const last = st.last_finished;
@@ -225,12 +308,14 @@
       ${section("Mais relevantes", d.top, "#/todas?sort=relevance", "lead")}
       ${section("Oficiais em destaque", d.official, "#/todas?official=1")}
       ${d.erp ? section("Notas técnicas e ajustes em ERP", d.erp, "#/erp") : ""}
+      ${nextEvents().length ? `<section class="section"><div class="section-head"><h2>Próximos eventos de tecnologia</h2><a href="#/eventos">Ver agenda →</a></div><div class="ev-grid">${nextEvents().map(eventCard).join("")}</div></section>` : ""}
       <div class="cols">
         <div>${section("Últimas fiscais", d.fiscal, "#/c/fiscal", "list")}</div>
         <div>${section("Novidades de IA", d.ia, "#/c/ia", "list")}</div>
         <div>${section("Programação", d.programacao, "#/c/programacao", "list")}</div>
       </div>`;
     fixImages(view);
+    fixEventImages(view);
   }
 
   // ------------------------------------------------------------ listas (abas)
@@ -266,6 +351,8 @@
     const c = isErp ? ERP : isAll ? { name: "Todas as notícias", color: "#0b5cad" } : catOf(cat);
     const fiscal = cat === "fiscal" || cat === "reforma" || isErp;
     const f = Object.fromEntries(params.entries());
+    // "Notícias Brasil" vale para todas as categorias: fica marcado ao trocar de aba
+    if (!("brasil" in f) && store.get("radar-brasil", "") === "1") f.brasil = "1";
     const q = f.q || "";
     $("#searchInput").value = q;
     const opt = (v, label, cur) => `<option value="${esc(v)}" ${String(cur ?? "") === String(v) ? "selected" : ""}>${esc(label)}</option>`;
@@ -287,6 +374,7 @@
         <input type="date" name="from" value="${esc(f.from || "")}" aria-label="De" ${f.period === "custom" ? "" : "hidden"}>
         <input type="date" name="to" value="${esc(f.to || "")}" aria-label="Até" ${f.period === "custom" ? "" : "hidden"}>
         <select name="min_relevance" aria-label="Relevância">${opt("", "Qualquer relevância", f.min_relevance)}${opt("40", "Relevância média ou alta", f.min_relevance)}${opt("60", "Somente alta relevância", f.min_relevance)}</select>
+        <label class="check" title="Somente notícias de veículos e órgãos brasileiros (sites .br, fontes brasileiras e buscas em português)"><input type="checkbox" name="brasil" value="1" ${f.brasil ? "checked" : ""}> Notícias Brasil</label>
         <label class="check" title="Receita, gov.br, Câmara, Senado, SEFAZ, CONFAZ, Comitê Gestor e outras fontes oficiais"><input type="checkbox" name="${fiscal ? "doc_type" : "official"}" value="${fiscal ? "oficial" : "1"}" ${(fiscal ? f.doc_type === "oficial" : f.official) ? "checked" : ""}> Somente oficiais</label>
         ${fiscal ? `<select name="legal_stage" aria-label="Estágio">${opt("", "Qualquer estágio", f.legal_stage)}${Object.entries(STAGES).map(([k, v]) => opt(k, v, f.legal_stage)).join("")}</select>` : ""}
         ${isErp ? `<select name="erp_doc" aria-label="Documento ou obrigação">${opt("", "Qualquer documento", f.erp_doc)}${ERP_DOCS.map((x) => opt(x, x, f.erp_doc)).join("")}</select>`
@@ -304,6 +392,7 @@
       const p = new URLSearchParams();
       if (q) p.set("q", q);
       for (const [k, v] of data.entries()) if (v) p.set(k, v);
+      if (ev.target.name === "brasil") store.set("radar-brasil", ev.target.checked ? "1" : "");
       if (ev.target.name === "period" && ev.target.value !== "custom") { p.delete("from"); p.delete("to"); }
       location.hash = `#/${base}${p.toString() ? "?" + p : ""}`;
     });
@@ -314,6 +403,7 @@
     apiParams.set("category", isAll ? (f.category || "todas") : cat);
     ["source", "min_relevance", "doc_type", "legal_stage", "erp_doc", "sort"].forEach((k) => f[k] && apiParams.set(k, f[k]));
     if (f.official) apiParams.set("official", "true");
+    if (f.brasil) apiParams.set("brasil", "true");
     if (isErp || f.erp) apiParams.set("erp", "true");
     if (f.period && f.period !== "custom") {
       const start = periodStart(f.period);
@@ -341,6 +431,83 @@
     };
     $("#moreBtn").addEventListener("click", load);
     await load();
+  }
+
+  // ------------------------------------------------------------ aba Eventos
+  const EV_PERIODS = [["7", "7 dias"], ["30", "30 dias"], ["90", "3 meses"], ["", "Todos os próximos"]];
+  async function viewEvents(view, params) {
+    const data = await loadEvents();
+    renderNav();
+    const f = Object.fromEntries(params.entries());
+    if (!("brasil" in f) && store.get("radar-brasil", "") === "1") f.brasil = "1";
+    const all = upcomingEvents();
+    const opt = (v, label, cur) => `<option value="${esc(v)}" ${String(cur ?? "") === String(v) ? "selected" : ""}>${esc(label)}</option>`;
+    const counts = {};
+    all.forEach((e) => e.themes.forEach((t) => { counts[t] = (counts[t] || 0) + 1; }));
+    const states = [...new Set(all.filter((e) => e.state && e.format !== "online").map((e) => e.state))].sort();
+    const q = (f.q || "").trim();
+    $("#searchInput").value = q;
+    view.innerHTML = `
+      <div class="page-head"><div><div class="eyebrow" style="color:${EV.color}">Agenda</div><h1>${EV.name}</h1>
+      <p>Workshops, meetups, conferências, feiras e webinars de IA, programação, cibersegurança, dados, varejo, agro e inovação, online e presenciais. Coletados de agendas públicas (Sympla, Meetup, Luma, dev.events, confs.tech); eventos encerrados somem sozinhos. Confirme datas e inscrições na página do evento.</p></div></div>
+      <form class="filters" id="evFilters">
+        <div class="periods" role="radiogroup" aria-label="Tema">
+          <span class="periods-label">Tema</span>
+          <label class="period ${!f.tema ? "on" : ""}"><input type="radio" name="tema" value="" ${!f.tema ? "checked" : ""}><span>Todos (${all.length})</span></label>
+          ${(data.themes || []).filter((t) => counts[t.slug]).map((t) => `<label class="period ${f.tema === t.slug ? "on" : ""}" style="--c:${t.color}"><input type="radio" name="tema" value="${esc(t.slug)}" ${f.tema === t.slug ? "checked" : ""}><span>${esc(t.name)} (${counts[t.slug]})</span></label>`).join("")}
+        </div>
+        <div class="periods" role="radiogroup" aria-label="Quando">
+          <span class="periods-label">Quando</span>
+          ${EV_PERIODS.map(([v, label]) => `<label class="period ${String(f.periodo ?? "") === v ? "on" : ""}"><input type="radio" name="periodo" value="${v}" ${String(f.periodo ?? "") === v ? "checked" : ""}><span>${label}</span></label>`).join("")}
+        </div>
+        <select name="formato" aria-label="Formato">${opt("", "Online e presencial", f.formato)}${opt("online", "Somente online", f.formato)}${opt("presencial", "Presencial ou híbrido", f.formato)}</select>
+        <select name="uf" aria-label="Estado">${opt("", "Todos os estados", f.uf)}${states.map((s) => opt(s, s, f.uf)).join("")}</select>
+        <label class="check" title="Eventos no Brasil e eventos online em português"><input type="checkbox" name="brasil" value="1" ${f.brasil ? "checked" : ""}> Eventos Brasil</label>
+        <label class="check" title="Eventos gratuitos, segundo a página do evento ou a agenda de origem"><input type="checkbox" name="gratis" value="1" ${f.gratis ? "checked" : ""}> Grátis (${all.filter((e) => e.free).length})</label>
+        <label class="check" title="Eventos que mencionam a emissão de certificado na descrição"><input type="checkbox" name="certificado" value="1" ${f.certificado ? "checked" : ""}> Com certificado (${all.filter((e) => e.certificate).length})</label>
+        <input type="search" name="q" value="${esc(q)}" placeholder="Filtrar por nome, cidade, organizador…" aria-label="Filtrar eventos" class="ev-q">
+      </form>
+      <p class="results-info" id="info"></p>
+      <div id="evList"></div>`;
+    const form = $("#evFilters");
+    const go = (ev) => {
+      const p = new URLSearchParams();
+      for (const [k, v] of new FormData(form).entries()) if (v) p.set(k, v);
+      if (ev && ev.target.name === "brasil") store.set("radar-brasil", ev.target.checked ? "1" : "");
+      location.hash = `#/eventos${p.toString() ? "?" + p : ""}`;
+    };
+    form.addEventListener("change", go);
+    form.addEventListener("submit", (ev) => { ev.preventDefault(); go(); });
+
+    const norm = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+    const words = norm(q).split(/\s+/).filter(Boolean);
+    const limit = f.periodo ? localDay(new Date(Date.now() + Number(f.periodo) * 86400000)) : null;
+    const list = all.filter((e) => (!f.tema || e.themes.includes(f.tema))
+      && (!f.formato || (f.formato === "online" ? e.format === "online" || e.format === "hibrido" : e.format === "presencial" || e.format === "hibrido"))
+      && (!f.uf || e.state === f.uf)
+      && (!f.brasil || e.scope === "brasil")
+      && (!f.gratis || e.free === true)
+      && (!f.certificado || e.certificate === true)
+      && (!limit || localDay(evDate(e.start)) <= limit)
+      && (!words.length || words.every((w) => norm(`${e.title} ${e.organizer} ${e.city} ${e.state} ${e.venue} ${e.description} ${e.source}`).includes(w))));
+    const box = $("#evList");
+    $("#info").textContent = `${list.length.toLocaleString("pt-BR")} evento(s) · ordenados pela data · atualizado ${data.generated_at ? fmtLocal(data.generated_at) : "—"}`;
+    if (!list.length) {
+      box.innerHTML = `<div class="empty">${all.length ? "Nenhum evento com esses filtros. Tente outro tema ou um período maior." : "Nenhum evento coletado ainda. A coleta de eventos roda a cada 6 horas."}</div>`;
+      return;
+    }
+    const groups = new Map();
+    list.forEach((e) => {
+      const d = evDate(e.start); const now = new Date();
+      const key = d < now ? localDay(now).slice(0, 7) : localDay(d).slice(0, 7);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(e);
+    });
+    box.innerHTML = [...groups.entries()].map(([k, evs]) => {
+      const title = fmtMonthYear.format(new Date(`${k}-15T12:00:00`));
+      return `<section class="section"><div class="section-head"><h2>${esc(title.charAt(0).toUpperCase() + title.slice(1))}</h2><span class="hint">${evs.length} evento(s)</span></div><div class="ev-grid">${evs.map(eventCard).join("")}</div></section>`;
+    }).join("");
+    fixEventImages(box);
   }
 
   // ------------------------------------------------------------ detalhe
@@ -376,7 +543,7 @@
 
   // ------------------------------------------------------------ fontes e coleta
   async function viewSources(view) {
-    const [sources, runs] = await Promise.all([api("/api/sources"), api("/api/runs?limit=50")]);
+    const [sources, runs, evData] = await Promise.all([api("/api/sources"), api("/api/runs?limit=50"), loadEvents(true).catch(() => null)]);
     const typeName = { rss: "RSS", html: "Página", search: "Busca" };
     view.innerHTML = `
       <div class="page-head"><div><h1>Fontes e coleta</h1><p>${sources.filter((s) => s.enabled).length} fontes ativas. ${STATIC ? "Coleta automática a cada hora pelo GitHub Actions." : `Atualização automática a cada ${S.status?.interval_min ?? 60} minutos (configurável no arquivo .env).`}</p></div></div>
@@ -405,6 +572,12 @@
         ${STATIC ? "" : `<td style="white-space:nowrap"><button class="btn btn-sm" data-collect="${esc(s.id)}">Coletar</button> <button class="btn btn-sm" data-toggle="${esc(s.id)}" data-enabled="${s.enabled}">${s.enabled ? "Desativar" : "Ativar"}</button></td>`}
       </tr>`).join("")}
       </tbody></table></div>
+      ${evData ? `<h3 style="margin-top:24px">Fontes de eventos</h3>
+      <p class="hint">Agendas públicas lidas a cada 6 horas para a aba ${EV.name}. Ficam no arquivo config/events.json.</p>
+      <div class="table-wrap"><table><thead><tr><th>Fonte</th><th>Tipo</th><th>Última coleta</th><th>Status</th><th>Lidos</th><th>Mantidos</th></tr></thead><tbody>
+      ${evData.sources.map((s) => `<tr><td><strong>${esc(s.name)}</strong><div class="hint">${esc(s.url || "")}</div></td><td>${esc(s.type)}</td><td>${fmtLocal(s.last_run_at)}</td>
+        <td><span class="st ${esc(s.status || "")}">${esc(s.enabled ? s.status || "aguardando" : "desativada")}</span>${s.error ? `<div class="hint" style="color:var(--bad)">${esc(s.error)}</div>` : ""}</td><td>${s.found ?? ""}</td><td>${s.kept ?? ""}</td></tr>`).join("")}
+      </tbody></table></div>` : ""}
       <h3 style="margin-top:24px">Histórico das últimas atualizações</h3>
       <div class="table-wrap"><table><thead><tr><th>#</th><th>Início</th><th>Fim</th><th>Origem</th><th>Status</th><th>Fontes ok</th><th>Inalteradas</th><th>Com falha</th><th>Novas</th><th></th></tr></thead><tbody>
       ${runs.map((r) => `<tr><td>${r.id}</td><td>${fmtLocal(r.started_at)}</td><td>${fmtLocal(r.finished_at)}</td><td>${esc(r.trigger)}</td><td><span class="st ${esc(r.status)}">${esc(r.status)}</span></td><td>${r.sources_ok}</td><td>${r.sources_unchanged}</td><td>${r.sources_failed}</td><td>${r.new_items}</td><td><button class="btn btn-sm" data-run="${r.id}">Detalhes</button></td></tr>`).join("") || `<tr><td colspan="10">Nenhuma coleta registrada ainda.</td></tr>`}
@@ -457,8 +630,8 @@
       $("#statusBox").title = st.failing_sources.length ? `Fontes com falha: ${st.failing_sources.map((s) => s.name).join(", ")}` : "Todas as fontes responderam na última coleta";
       const btn = $("#refreshBtn");
       btn.disabled = st.running; btn.classList.toggle("spin", st.running);
-      if (was && !st.running) { toast(`Coleta concluída: ${last ? last.new_items : 0} notícia(s) nova(s).`); await loadMeta(); router(); }
-      if (st.data_changed) { toast("Novas notícias publicadas. A página foi atualizada."); await loadMeta(); if (!$("#modal").open) router(); }
+      if (was && !st.running) { toast(`Coleta concluída: ${last ? last.new_items : 0} notícia(s) nova(s).`); S.events = null; await loadMeta(); router(); }
+      if (st.data_changed) { toast("Novas notícias publicadas. A página foi atualizada."); S.events = null; await loadMeta(); if (!$("#modal").open) router(); }
       pollStatus._t = setTimeout(pollStatus, STATIC ? 300000 : st.running ? 4000 : 60000);
     } catch {
       $("#statusDot").className = "dot falhas"; $("#statusText").textContent = STATIC ? "Sem conexão" : "Servidor indisponível";
@@ -495,6 +668,7 @@
       ev.preventDefault();
       const q = $("#searchInput").value.trim();
       const { path } = parseHash();
+      if (path === "eventos") { location.hash = `#/eventos${q ? "?q=" + encodeURIComponent(q) : ""}`; return; }
       const base = path.startsWith("c/") ? path : "todas";
       location.hash = `#/${base}${q ? "?q=" + encodeURIComponent(q) : ""}`;
     });

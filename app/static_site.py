@@ -10,7 +10,7 @@ import shutil
 from datetime import timedelta
 from pathlib import Path
 
-from . import config, db
+from . import config, db, eventos
 from .processing import llm
 from .processing.legal import STAGE_LABELS
 from .processing.normalize import STOPWORDS
@@ -45,6 +45,8 @@ def _articles() -> list[dict]:
         for k in DROP:
             d.pop(k, None)
         d["excerpt"] = (d.get("excerpt") or "")[:400]
+        if not d.get("brasil"):  # só as brasileiras levam a marca (deixa o JSON menor)
+            d.pop("brasil", None)
         if not d.get("erp_impact"):  # só as marcadas levam os detalhes (deixa o JSON menor)
             for k in ("erp_impact", "erp_docs", "erp_reason"):
                 d.pop(k, None)
@@ -125,8 +127,10 @@ def export(out_dir: Path) -> dict:
     for r in runs[:20]:
         r["logs"] = db.run_logs(r["id"])
     _write(out_dir / "data" / "fontes.json", {"generated_at": generated, "sources": public_sources, "runs": runs})
+    ev = eventos.upcoming()
+    _write(out_dir / "data" / "eventos.json", ev)
     _write(out_dir / "data" / "status.json", {"generated_at": generated})
-    return {"articles": len(articles), "generated_at": generated}
+    return {"articles": len(articles), "events": len(ev["events"]), "generated_at": generated}
 
 
 def _goatcounter_code() -> str:
