@@ -307,6 +307,10 @@ td.err { color: var(--bad); max-width: 360px; }
 .badge.fmt.online { color: #0369a1; background: #e0f2fe; border-color: transparent; }
 .badge.fmt.presencial { color: #166534; background: #dcfce7; border-color: transparent; }
 .badge.fmt.hibrido { color: #6d28d9; background: #ede9fe; border-color: transparent; }
+.badge.ev-free { color: #065f46; background: #d1fae5; border-color: transparent; }
+.badge.ev-cert { color: #92400e; background: #fef3c7; border-color: transparent; }
+:root[data-theme="dark"] .badge.ev-free, :root[data-theme="dark"] .badge.ev-cert { filter: saturate(.9) brightness(.85); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .badge.ev-free, :root:not([data-theme="light"]) .badge.ev-cert { filter: saturate(.9) brightness(.85); } }
 :root[data-theme="dark"] .badge.fmt { filter: saturate(.9) brightness(.85); }
 .period[style*="--c"].on span, .period[style*="--c"] input:checked + span { background: var(--c); border-color: var(--c); color: #fff; }
 .filters .ev-q { height: 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); padding: 0 12px; flex: 1 1 240px; min-width: 0; }

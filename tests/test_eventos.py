@@ -120,5 +120,62 @@ class TestExtracao(unittest.TestCase):
         self.assertIn("agro", eventos.themes_for({"title": "IA no agronegócio"}, CFG))
 
 
+class TestGratisECertificado(unittest.TestCase):
+    def test_luma_ticket_info_e_offers(self):
+        nd = {"props": {"pageProps": {"initialData": {"data": {"events": [
+            {"event": {"name": "Workshop de IA", "start_at": "2026-11-25T22:00:00.000Z", "url": "aaa", "location_type": "online"},
+             "ticket_info": {"price": None, "is_free": True}},
+            {"event": {"name": "Conferência de Dados", "start_at": "2026-11-26T22:00:00.000Z", "url": "bbb", "location_type": "online"},
+             "ticket_info": {"price": {"cents": 15000}, "is_free": False}}]}}}}}
+        evs = eventos.extract_events(eventos.page_blobs(html_com(next_data=nd)), "https://luma.com/sao-paulo")
+        self.assertEqual([e["free"] for e in evs], [True, False])
+        ld = {"@type": "Event", "name": "Meetup Python", "startDate": "2026-12-03T19:00:00-03:00", "url": "https://x.org/e",
+              "offers": [{"@type": "Offer", "price": 0, "priceCurrency": "BRL"}]}
+        self.assertTrue(eventos.extract_events(eventos.page_blobs(html_com(ld)), "https://x.org")[0]["free"])
+        ld["offers"] = {"@type": "AggregateOffer", "lowPrice": "0", "highPrice": "R$ 120,00"}
+        self.assertFalse(eventos.extract_events(eventos.page_blobs(html_com(ld)), "https://x.org")[0]["free"])
+
+    def test_meetup_sem_taxa_e_gratis(self):
+        nd = {"props": {"pageProps": {"__APOLLO_STATE__": {
+            "Event:9": {"__typename": "Event", "title": "Meetup de Python", "dateTime": "2026-12-01T19:00:00-03:00",
+                        "eventUrl": "https://www.meetup.com/python-sp/events/9/", "eventType": "ONLINE", "feeSettings": None},
+            "Event:10": {"__typename": "Event", "title": "Workshop de Python", "dateTime": "2026-12-02T19:00:00-03:00",
+                         "eventUrl": "https://www.meetup.com/python-sp/events/10/", "eventType": "ONLINE",
+                         "feeSettings": {"amount": 30, "currency": "BRL"}}}}}}
+        evs = eventos.extract_events(eventos.page_blobs(html_com(next_data=nd)), "https://www.meetup.com/find/")
+        self.assertEqual({e["url"][-3:]: e["free"] for e in evs}, {"/9/": True, "10/": False})
+
+    def test_texto(self):
+        self.assertEqual(eventos.text_flags("Workshop gratuito de IA", "Ao final, os participantes receberão certificado de participação."), (True, True))
+        self.assertEqual(eventos.text_flags("Emissão de certificado digital A1 para empresas"), (None, False))
+        self.assertEqual(eventos.text_flags("Ingressos a partir de R$ 50"), (False, False))
+        self.assertEqual(eventos.text_flags("Free admission. Certificate of attendance provided."), (True, True))
+
+    def test_finalize_marca_fonte_gratuita_e_certificado(self):
+        base = {"title": "Curso de Python com certificado", "url": "https://www.sympla.com.br/evento/x/1", "mode": "online",
+                "start_dt": datetime(2026, 12, 5, 22, tzinfo=timezone.utc), "all_day": False, "end_dt": None, "end_all_day": False}
+        fin = eventos.finalize(dict(base), {"id": "sympla-gratis", "country": "BR", "mark_free": True}, CFG, HOJE)
+        self.assertEqual((fin["free"], fin["certificate"]), (True, True))
+        fin = eventos.finalize(dict(base, title="Curso de Python"), {"id": "s", "country": "BR"}, CFG, HOJE)
+        self.assertEqual((fin["free"], fin["certificate"]), (None, None))
+
+    def test_pagina_do_evento(self):
+        html = ('<html><body><nav>Grátis</nav><h1>Curso de IA</h1><div>Ao final do curso, os participantes receberão '
+                'um certificado de conclusão.</div><script>var x = "certificado";</script></body></html>')
+
+        class R:
+            text = html
+            url = "https://www.sympla.com.br/evento/curso/1"
+            status_code = 200
+        orig = eventos._get
+        eventos._get = lambda url: R()
+        try:
+            d = eventos.read_details("https://www.sympla.com.br/evento/curso/1")
+        finally:
+            eventos._get = orig
+        self.assertEqual((d["free"], d["certificate"]), (None, True))
+        self.assertFalse(eventos.text_flags(eventos.page_text("<nav>certificado</nav><p>Meetup</p>"))[1])
+
+
 if __name__ == "__main__":
     unittest.main()

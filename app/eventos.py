@@ -27,6 +27,7 @@ log = logging.getLogger("radar.eventos")
 EVENTS_FILE = config.CONFIG_DIR / "events.json"
 VERSION = 3                  # mude ao alterar a extração: força uma nova leitura de todas as fontes
 KEEP_PAST_DAYS = 30          # eventos encerrados há mais tempo saem do banco
+DETAILS_PER_RUN = 60         # páginas de eventos lidas por execução para achar preço e certificado
 MAX_AHEAD_DAYS = 550         # ignora datas absurdamente distantes (erro de cadastro)
 _lock = threading.Lock()
 
@@ -728,6 +729,8 @@ def finalize(raw: dict, src: dict, cfg: dict, today: date) -> dict | None:
         return None
     ev["themes"] = themes or ["geral"]
     t_free, t_cert = text_flags(ev["title"], ev.get("description"))
+    if src.get("mark_free"):
+        ev["free"] = True  # fonte só de eventos gratuitos (seção Grátis da Sympla)
     ev["free"] = ev.get("free") if ev.get("free") is not None else t_free
     ev["certificate"] = True if (ev.get("certificate") or t_cert) else None
     ev["start"] = _iso(start, ev.pop("all_day", False))
@@ -839,9 +842,67 @@ def collect(force: bool = False, only: list[str] | None = None) -> dict:
                            state["failures"], state["found"], state["kept"]))
             summary[src["id"]] = state
         prune()
+        try:
+            summary["_detalhes"] = enrich(cfg)
+        except Exception:  # noqa: BLE001
+            log.exception("Eventos: falha ao ler páginas de eventos")
         return summary
     finally:
         _lock.release()
+
+
+TAG_RE = re.compile(r"<[^>]+>")
+NOISE_RE = re.compile(r"<(script|style|noscript|svg|template)\b.*?</\1>|<(nav|header|footer)\b.*?</\2>", re.S | re.I)
+
+
+def page_text(html: str) -> str:
+    """Texto visível da página (sem scripts, menus e rodapé), para procurar menções a certificado."""
+    t = NOISE_RE.sub(" ", html)
+    t = TAG_RE.sub(" ", t)
+    return clean_text(t)
+
+
+def read_details(url: str) -> dict:
+    """Lê a página do evento: preço (campos estruturados) e certificado (descrição completa / texto da página)."""
+    r = _get(url)
+    blobs = page_blobs(r.text)
+    key = canonical_url(url)
+    found = [e for e in extract_events(blobs, str(r.url)) if canonical_url(e["url"]) in (key, canonical_url(str(r.url)))]
+    ev = found[0] if found else {}
+    free = ev.get("free")  # a Sympla não informa preço na página (carrega depois); lá vale a seção "Grátis"
+    desc = ev.get("description") or ""
+    _, cert = text_flags(desc, page_text(r.text))
+    return {"free": free, "certificate": cert, "description": desc}
+
+
+def enrich(cfg: dict, limit: int = DETAILS_PER_RUN) -> int:
+    """Abre a página de eventos que ainda não foram lidos (fontes com "details": true), dos mais próximos aos mais distantes."""
+    ids = [s["id"] for s in cfg.get("sources", []) if s.get("details") and s.get("enabled", True)]
+    if not ids or limit <= 0:
+        return 0
+    today = db.now_utc().astimezone(BRT).date().isoformat()
+    with db.session() as c:
+        rows = [dict(r) for r in c.execute(
+            f"SELECT id, url FROM events WHERE details_at IS NULL AND source_id IN ({','.join('?' * len(ids))}) "
+            "AND substr(coalesce(end, start),1,10) >= ? ORDER BY start LIMIT ?", (*ids, today, limit))]
+    done = 0
+    for r in rows:
+        try:
+            d = read_details(r["url"])
+        except Exception as e:  # noqa: BLE001 — página fora do ar ou bloqueada: fica com o que a listagem informou
+            log.info("Eventos: não consegui ler %s (%s)", r["url"], e)
+            d = {"free": None, "certificate": False, "description": ""}
+        with db.WRITE_LOCK, db.session() as c:
+            c.execute("""UPDATE events SET details_at=?, free=coalesce(?, free),
+                         certificate=CASE WHEN ? THEN 1 ELSE certificate END,
+                         description=CASE WHEN length(?) > length(coalesce(description,'')) THEN ? ELSE description END
+                         WHERE id=?""",
+                      (db.iso(db.now_utc()), None if d["free"] is None else int(d["free"]), int(d["certificate"]),
+                       d["description"][:600], d["description"][:600], r["id"]))
+        done += 1
+    if rows:
+        log.info("Eventos: %s de %s páginas de eventos lidas (preço e certificado)", done, len(rows))
+    return done
 
 
 def prune() -> None:
