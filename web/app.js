@@ -157,7 +157,7 @@
       ${evCover(e)}
       <div class="ev-date" aria-hidden="true"><span class="wd">${esc(fmtWeek.format(a).replace(".", ""))}</span><span class="dd">${esc(fmtDay.format(a))}</span><span class="mm">${esc(fmtMon.format(a).replace(".", ""))}</span></div>
       <div class="ev-body">
-        <div class="badges"><span class="badge fmt ${esc(e.format)}">${esc(FORMATS[e.format] || e.format)}</span>${e.themes.slice(0, 3).map((t) => `<span class="badge cat" style="--c:${themeOf(t).color}">${esc(themeOf(t).name)}</span>`).join("")}</div>
+        <div class="badges"><span class="badge fmt ${esc(e.format)}">${esc(FORMATS[e.format] || e.format)}</span>${e.free ? `<span class="badge ev-free">Grátis</span>` : ""}${e.certificate ? `<span class="badge ev-cert">Com certificado</span>` : ""}${e.themes.slice(0, 3).map((t) => `<span class="badge cat" style="--c:${themeOf(t).color}">${esc(themeOf(t).name)}</span>`).join("")}</div>
         <h3><a href="${esc(safeUrl(e.url))}" target="_blank" rel="noopener noreferrer">${esc(e.title)}</a></h3>
         <div class="ev-meta"><span class="ev-when">${icon("calendar")}${evWhen(e)}</span><span class="ev-where">${evWhere(e)}</span></div>
         ${e.organizer ? `<div class="ev-org">Organização: <strong>${esc(e.organizer)}</strong></div>` : ""}
@@ -463,6 +463,8 @@
         <select name="formato" aria-label="Formato">${opt("", "Online e presencial", f.formato)}${opt("online", "Somente online", f.formato)}${opt("presencial", "Presencial ou híbrido", f.formato)}</select>
         <select name="uf" aria-label="Estado">${opt("", "Todos os estados", f.uf)}${states.map((s) => opt(s, s, f.uf)).join("")}</select>
         <label class="check" title="Eventos no Brasil e eventos online em português"><input type="checkbox" name="brasil" value="1" ${f.brasil ? "checked" : ""}> Eventos Brasil</label>
+        <label class="check" title="Eventos gratuitos, segundo a página do evento ou a agenda de origem"><input type="checkbox" name="gratis" value="1" ${f.gratis ? "checked" : ""}> Grátis (${all.filter((e) => e.free).length})</label>
+        <label class="check" title="Eventos que mencionam a emissão de certificado na descrição"><input type="checkbox" name="certificado" value="1" ${f.certificado ? "checked" : ""}> Com certificado (${all.filter((e) => e.certificate).length})</label>
         <input type="search" name="q" value="${esc(q)}" placeholder="Filtrar por nome, cidade, organizador…" aria-label="Filtrar eventos" class="ev-q">
       </form>
       <p class="results-info" id="info"></p>
@@ -484,6 +486,8 @@
       && (!f.formato || (f.formato === "online" ? e.format === "online" || e.format === "hibrido" : e.format === "presencial" || e.format === "hibrido"))
       && (!f.uf || e.state === f.uf)
       && (!f.brasil || e.scope === "brasil")
+      && (!f.gratis || e.free === true)
+      && (!f.certificado || e.certificate === true)
       && (!limit || localDay(evDate(e.start)) <= limit)
       && (!words.length || words.every((w) => norm(`${e.title} ${e.organizer} ${e.city} ${e.state} ${e.venue} ${e.description} ${e.source}`).includes(w))));
     const box = $("#evList");
