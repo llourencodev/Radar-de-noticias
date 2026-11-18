@@ -25,7 +25,7 @@ from .processing.normalize import BRT, canonical_url, clean_text, detect_lang, n
 
 log = logging.getLogger("radar.eventos")
 EVENTS_FILE = config.CONFIG_DIR / "events.json"
-VERSION = 2                  # mude ao alterar a extração: força uma nova leitura de todas as fontes
+VERSION = 3                  # mude ao alterar a extração: força uma nova leitura de todas as fontes
 KEEP_PAST_DAYS = 30          # eventos encerrados há mais tempo saem do banco
 MAX_AHEAD_DAYS = 550         # ignora datas absurdamente distantes (erro de cadastro)
 _lock = threading.Lock()
@@ -54,6 +54,12 @@ BR_STATES = {
 BR_STATE_BY_NAME = {v: k for k, v in BR_STATES.items()}
 ONLINE_WORDS = re.compile(r"\b(online|on-line|virtual|webinar|webinario|live|ao vivo|remoto|zoom|google meet|youtube|streaming|transmissao)\b")
 HYBRID_WORDS = re.compile(r"\b(hibrido|hibrida|hybrid|presencial e online|online e presencial)\b")
+# gratuidade e certificado escritos no título/descrição (texto sem acento e em minúsculas)
+FREE_WORDS = re.compile(r"\b(gratuit[oa]s?|gratis|entrada (franca|gratuita|livre)|inscric(ao|oes) gratuitas?|sem custo|"
+                        r"evento free|free (event|entry|admission|registration|ticket)|free of charge|no cost)\b")
+PAID_WORDS = re.compile(r"(r\$ ?\d|\bingressos? a partir de\b|\bvalor do ingresso\b|\binvestimento: ?r\$)")
+CERT_WORDS = re.compile(r"\b(certificados?(?! digita)(?! ssl)(?! a1)(?! a3)(?! icp)|certificate of (attendance|participation|completion)|"
+                        r"certificates? (included|provided|will be issued)|participants? (will )?receive a certificate)\b")
 
 
 # ---------------------------------------------------------------- configuração
@@ -297,6 +303,65 @@ def _image(d: dict, refs: _Refs, base: str = "") -> str | None:
     return None
 
 
+def _num(v) -> float | None:
+    if isinstance(v, bool) or v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str):
+        m = re.search(r"\d+(?:[.,]\d+)?", v.replace(".", "").replace(",", ".") if re.search(r"\d\.\d{3},", v) else v)
+        return float(m.group(0).replace(",", ".")) if m else None
+    if isinstance(v, dict):  # {"cents": 0} / {"amount": 1500}
+        return _num(v.get("amount") if "amount" in v else v.get("cents") if "cents" in v else v.get("value"))
+    return None
+
+
+def _free(d: dict, refs: _Refs) -> bool | None:
+    """Gratuito (True), pago (False) ou não informado (None), pelos campos estruturados da fonte:
+    schema.org (isAccessibleForFree, offers.price), Luma (ticket_info), Meetup (feeSettings), Eventbrite (is_free)."""
+    for k in ("isAccessibleForFree", "is_free", "isFree", "free"):
+        if isinstance(d.get(k), bool):
+            return d[k]
+    ti = refs.get_ref(d.get("ticket_info"))
+    if isinstance(ti, dict):
+        if isinstance(ti.get("is_free"), bool):
+            return ti["is_free"]
+        p = _num(ti.get("price"))
+        if p is not None:
+            return p == 0
+    if "feeSettings" in d and "__typename" in d:  # Meetup: sem taxa = evento gratuito
+        fee = refs.get_ref(d["feeSettings"])
+        if fee is None:
+            return True
+        if isinstance(fee, dict):
+            amt = _num(fee.get("amount"))
+            return None if amt is None else amt == 0
+    offers = refs.get_ref(d.get("offers"))
+    offers = offers if isinstance(offers, list) else [offers] if offers else []
+    prices = []
+    for o in offers:
+        o = refs.get_ref(o)
+        if isinstance(o, dict):
+            for k in ("price", "lowPrice", "highPrice"):
+                p = _num(o.get(k))
+                if p is not None:
+                    prices.append(p)
+    if prices:
+        return max(prices) == 0
+    for k in ("min_price", "minPrice", "price", "preco", "ticket_price"):
+        p = _num(d.get(k))
+        if p is not None:
+            return p == 0
+    return None
+
+
+def text_flags(*texts: str) -> tuple[bool | None, bool]:
+    """(gratuito?, tem certificado?) pelo que está escrito no título/descrição."""
+    low = strip_accents(" ".join(t or "" for t in texts).lower())
+    free = True if FREE_WORDS.search(low) else False if PAID_WORDS.search(low) else None
+    return free, bool(CERT_WORDS.search(low))
+
+
 def _from_obj(d: dict, parent: dict | None, refs: _Refs, base: str) -> dict | None:
     name = _first(d, NAME_KEYS)
     start_v = _first(d, START_KEYS)
@@ -334,12 +399,15 @@ def _from_obj(d: dict, parent: dict | None, refs: _Refs, base: str) -> dict | No
     if isinstance(tags, list):
         tags = ", ".join(_txt(refs.get_ref(t)) for t in tags[:12])
     desc = d.get("description") or d.get("summary") or d.get("descricao") or ""
+    free = _free(d, refs)
+    if free is None and parent:
+        free = _free(parent, refs)  # Luma: o preço fica no item da lista, ao lado do evento
     return {
         "title": clean_text(name)[:220], "url": url, "start_dt": start, "all_day": all_day,
         "end_dt": end if end and end >= start else None, "end_all_day": end_all_day,
         "mode": loc["mode"], "city": loc["city"], "state": loc["state"], "country": loc["country"], "venue": loc["venue"],
         "organizer": _organizer(d, parent, refs), "description": _txt(desc)[:600], "tags": _txt(tags)[:300],
-        "image": _image(d, refs, base),
+        "image": _image(d, refs, base), "free": free, "certificate": bool(text_flags(_txt(desc))[1]) or None,
     }
 
 
@@ -363,7 +431,7 @@ def extract_events(blobs: list, base: str) -> list[dict]:
                 else:  # o mesmo evento em outro bloco (ex.: JSON-LD + estado do Next.js): completa o que faltava
                     first = seen[key]
                     for k, v in ev.items():
-                        if v and not first.get(k):
+                        if v not in (None, "") and first.get(k) in (None, ""):
                             first[k] = v
             for k, v in obj.items():
                 if isinstance(v, dict) and set(v) == {"__ref"}:
@@ -485,6 +553,7 @@ def fetch_ical(src: dict) -> list[dict]:
             "country": None, "venue": None if mode == "online" else loc[:160] or None,
             "organizer": src.get("organizer") or (cal.group(1).strip() if cal else None),
             "description": clean_text(desc)[:600], "tags": "", "image": None,
+            "free": None, "certificate": text_flags(desc)[1] or None,
         })
     return out
 
@@ -560,7 +629,7 @@ def fetch_devevents(src: dict) -> list[dict]:
             "title": clean_text(e.get("title"))[:220], "url": link, "start_dt": info["start_dt"], "all_day": True,
             "end_dt": info["end_dt"], "end_all_day": True, "mode": info["mode"], "city": info["city"], "state": None,
             "country": info["country"], "venue": None, "organizer": None,
-            "description": clean_text(e.get("summary"))[:600], "tags": tags, "image": img,
+            "description": clean_text(e.get("summary"))[:600], "tags": tags, "image": img, "free": None, "certificate": None,
         })
     return out
 
@@ -606,6 +675,7 @@ def fetch_confstech(src: dict) -> list[dict]:
                     "title": c["name"][:220], "url": c["url"], "start_dt": start, "all_day": True, "end_dt": end,
                     "end_all_day": True, "mode": mode, "city": city, "state": None, "country": _country(c.get("country")),
                     "venue": None, "organizer": None, "description": "", "tags": CONFS_TAGS.get(topic, topic), "image": None,
+                    "free": None, "certificate": None,
                 })
     if not ok and errors:
         raise RuntimeError("; ".join(errors[:3]))
@@ -657,6 +727,9 @@ def finalize(raw: dict, src: dict, cfg: dict, today: date) -> dict | None:
     if not themes and src.get("require_topic"):
         return None
     ev["themes"] = themes or ["geral"]
+    t_free, t_cert = text_flags(ev["title"], ev.get("description"))
+    ev["free"] = ev.get("free") if ev.get("free") is not None else t_free
+    ev["certificate"] = True if (ev.get("certificate") or t_cert) else None
     ev["start"] = _iso(start, ev.pop("all_day", False))
     ev["end"] = _iso(end, ev.pop("end_all_day", False)) if end else None
     ev.pop("mode", None)
@@ -677,6 +750,11 @@ def scope_of(ev: dict) -> str:
 def init() -> None:
     with db.WRITE_LOCK, db.session() as c:
         c.executescript(SCHEMA)
+        cols = {r[1] for r in c.execute("PRAGMA table_info(events)")}
+        # free: 1 gratuito, 0 pago, NULL não informado; certificate: 1 quando a fonte menciona certificado
+        for col in ("free INTEGER", "certificate INTEGER", "details_at TEXT"):
+            if col.split()[0] not in cols:
+                c.execute(f"ALTER TABLE events ADD COLUMN {col}")
 
 
 def _save(events: list[dict], src: dict) -> int:
@@ -692,18 +770,20 @@ def _save(events: list[dict], src: dict) -> int:
                 continue  # o mesmo evento já veio por outra fonte
             c.execute(
                 """INSERT INTO events (id,url,title,title_norm,start,end,all_day,format,city,state,country,venue,organizer,
-                   description,tags,image,source_id,source_name,first_seen,last_seen)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   description,tags,image,source_id,source_name,first_seen,last_seen,free,certificate)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(id) DO UPDATE SET title=excluded.title, title_norm=excluded.title_norm, start=excluded.start,
                    end=excluded.end, all_day=excluded.all_day, format=excluded.format,
                    city=coalesce(excluded.city, events.city), state=coalesce(excluded.state, events.state),
                    country=coalesce(excluded.country, events.country), venue=coalesce(excluded.venue, events.venue),
                    organizer=coalesce(excluded.organizer, events.organizer),
                    description=CASE WHEN excluded.description<>'' THEN excluded.description ELSE events.description END,
-                   tags=excluded.tags, image=coalesce(excluded.image, events.image), last_seen=excluded.last_seen""",
+                   tags=excluded.tags, image=coalesce(excluded.image, events.image), last_seen=excluded.last_seen,
+                   free=coalesce(excluded.free, events.free), certificate=coalesce(excluded.certificate, events.certificate)""",
                 (eid, ev["url"], ev["title"], tn, ev["start"], ev["end"], int(len(ev["start"]) == 10), ev["format"],
                  ev.get("city"), ev.get("state"), ev.get("country"), ev.get("venue"), ev.get("organizer"),
-                 ev.get("description") or "", ev.get("tags") or "", ev.get("image"), src["id"], src["name"], now, now))
+                 ev.get("description") or "", ev.get("tags") or "", ev.get("image"), src["id"], src["name"], now, now,
+                 None if ev.get("free") is None else int(ev["free"]), 1 if ev.get("certificate") else None))
             saved += 1
     return saved
 
@@ -789,12 +869,15 @@ def upcoming() -> dict:
         themes = themes_for(r, cfg)
         if not themes and src.get("require_topic"):
             continue
+        t_free, t_cert = text_flags(r["title"], r["description"])
+        free = bool(r["free"]) if r.get("free") is not None else t_free
         events.append({
             "id": r["id"], "title": r["title"], "url": r["url"], "start": r["start"], "end": r["end"],
             "all_day": bool(r["all_day"]), "format": r["format"], "city": r["city"], "state": r["state"],
             "country": r["country"], "venue": r["venue"], "organizer": r["organizer"],
             "description": (r["description"] or "")[:300], "image": r["image"], "themes": themes or ["geral"],
             "scope": scope_of(r), "source": r["source_name"], "source_id": r["source_id"],
+            "free": free, "certificate": bool(r.get("certificate") or t_cert),
         })
     states = source_states()
     sources = [{"id": s["id"], "name": s["name"], "type": s["type"], "url": s.get("url"),
