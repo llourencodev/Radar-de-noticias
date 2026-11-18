@@ -98,15 +98,13 @@ Configuração única no repositório: **Settings › Pages › Source: GitHub A
 
 IA opcional, sem expor a chave: em **Settings › Secrets and variables › Actions**, crie o secret `ANTHROPIC_API_KEY` e a variável `LLM_PROVIDER` = `anthropic`. O arquivo `.env` nunca vai para o GitHub.
 
-### Contador de acessos (opcional, grátis)
+### Contador de acessos (grátis)
 
 O site publicado pode contar os acessos com o [GoatCounter](https://www.goatcounter.com): gratuito, sem cookies e sem guardar dados pessoais (por isso não precisa de aviso de cookies).
 
-1. Crie a conta em https://www.goatcounter.com/signup. Em **Code**, escolha um nome curto, por exemplo `radar-leandro`; o painel fica em `https://radar-leandro.goatcounter.com`.
-2. No GitHub: **Settings › Secrets and variables › Actions › Variables › New repository variable**, nome `GOATCOUNTER_CODE`, valor `radar-leandro` (só o código).
-3. Rode **Actions › Coletar notícias e publicar o site › Run workflow** (ou espere a próxima coleta).
+O contador já vem ligado com a conta `leandro`: os acessos aparecem em https://leandro.goatcounter.com. Para usar outra conta, crie-a em https://www.goatcounter.com/signup e, no GitHub, crie a variável `GOATCOUNTER_CODE` (**Settings › Secrets and variables › Actions › Variables**) com o código da nova conta. O site é refeito na próxima coleta (ou em **Actions › Run workflow**).
 
-O painel mostra visitantes e páginas vistas por dia e por hora, as abas mais abertas, de onde vieram (Google, WhatsApp, links diretos), país, navegador, sistema e tamanho de tela. Os acessos de agora aparecem em poucos segundos. Para não contar os seus próprios acessos, abra o painel em cada navegador seu e use **Settings › Ignore IPs** (ou a opção de ignorar o navegador). Para desligar, apague a variável `GOATCOUNTER_CODE` e rode o workflow de novo.
+O painel mostra visitantes e páginas vistas por dia e por hora, as abas mais abertas, de onde vieram (Google, WhatsApp, links diretos), país, navegador, sistema e tamanho de tela. Os acessos de agora aparecem em poucos segundos. Para não contar os seus próprios acessos, abra o painel em cada navegador seu e use **Settings › Ignore IPs** (ou a opção de ignorar o navegador). Para desligar, troque o valor padrão `'leandro'` em `.github/workflows/radar.yml` por `''`.
 
 Só são contados acessos a partir da ativação: o GitHub Pages não guarda registro de visitas, então os acessos anteriores não podem ser recuperados. A versão local (`iniciar.bat`) não envia nada.
 
