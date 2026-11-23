@@ -326,3 +326,35 @@ td.err { color: var(--bad); max-width: 360px; }
 }
 .sidebar-credit span { font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--side-muted); }
 .sidebar-credit strong { font-size: 14px; font-weight: 600; letter-spacing: .01em; color: #e2e8f0; }
+
+/* ------------------------------------------------------------ acessos e login */
+.login-link { align-self: flex-start; margin-top: 6px; font-size: 12px; color: var(--side-muted); text-decoration: none; }
+.login-link:hover { color: #e2e8f0; text-decoration: underline; }
+.login-wrap { display: flex; justify-content: center; padding: 40px 0; }
+.login { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; padding: 28px; }
+.login h1 { margin: 0; font-size: 22px; }
+.login-ico { width: 40px; height: 40px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+.login label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-2); }
+.login input { height: 40px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); padding: 0 12px; }
+.login-err { margin: 0; min-height: 1.2em; font-size: 13px; color: var(--bad); }
+.login .btn { justify-content: center; height: 40px; }
+.acc-kpis { margin-top: 14px; }
+.acc-cols { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 8px; height: 220px; }
+.acc-grid { display: flex; flex-direction: column; justify-content: space-between; font-size: 11px; color: var(--text-3); text-align: right; padding-bottom: 20px; font-variant-numeric: tabular-nums; }
+.acc-plot { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 2px; align-items: end; border-bottom: 1px solid var(--border);
+  background: linear-gradient(var(--border) 1px, transparent 1px) 0 0 / 100% 50%; margin-bottom: 20px; }
+.acc-col { position: relative; height: 100%; display: flex; align-items: flex-end; outline: none; cursor: default; }
+.acc-col i { display: block; width: 100%; max-width: 28px; margin: 0 auto; min-height: 1px; background: var(--accent); border-radius: 4px 4px 0 0; }
+.acc-col:hover i, .acc-col:focus-visible i { background: color-mix(in srgb, var(--accent) 75%, var(--text)); }
+.acc-col b { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); padding-top: 4px; font-size: 11px; font-weight: 400; color: var(--text-3); white-space: nowrap; }
+.acc-tip { position: absolute; z-index: 5; pointer-events: none; background: var(--text); color: var(--surface); font-size: 12.5px; padding: 6px 10px; border-radius: 6px; white-space: nowrap; box-shadow: var(--shadow); }
+.acc-chart { position: relative; }
+a.period { text-decoration: none; }
+.acc-lists { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0 18px; }
+.acc-list ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.acc-list li { position: relative; display: flex; justify-content: space-between; gap: 10px; padding: 6px 10px; font-size: 13.5px; border-radius: 6px; overflow: hidden; }
+.acc-bar { position: absolute; inset: 0 auto 0 0; background: var(--accent-soft); border-radius: 0 4px 4px 0; z-index: 0; }
+.acc-name, .acc-n { position: relative; z-index: 1; }
+.acc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acc-n { font-variant-numeric: tabular-nums; color: var(--text-2); }
+@media (max-width: 700px) { .acc-cols { height: 180px; } .acc-col b { font-size: 10px; } }

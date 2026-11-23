@@ -1,0 +1,25 @@
+[Unit]
+Description=Contador de acessos do Radar de Noticias
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/radar-contador.env
+ExecStart=/usr/bin/python3 /opt/radar-contador/servidor.py
+Restart=always
+RestartSec=5
+DynamicUser=yes
+StateDirectory=radar-contador
+# proteções: o serviço só enxerga a própria pasta de dados
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+MemoryMax=200M
+
+[Install]
+WantedBy=multi-user.target
