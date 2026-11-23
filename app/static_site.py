@@ -88,11 +88,16 @@ def export(out_dir: Path) -> dict:
     scripts = '<script src="static-api.js"></script>\n<script src="app.js"></script>'
     csp = CSP
     gc = _goatcounter_code()
-    if gc:
+    own = _contador_url()
+    if gc or own:
         shutil.copy2(config.WEB_DIR / "contador.js", out_dir / "contador.js")
-        scripts += f'\n<script src="contador.js" data-goatcounter-code="{gc}"></script>'
-        csp = csp.replace("script-src 'self'", "script-src 'self' https://gc.zgo.at")
-        csp = csp.replace("connect-src 'self'", f"connect-src 'self' https://{gc}.goatcounter.com")
+        attrs = (f' data-contador-url="{own}"' if own else "") + (f' data-goatcounter-code="{gc}"' if gc else "")
+        # antes do app.js: a interface lê o endereço do contador nesta tag para mostrar o login
+        scripts = f'<script src="contador.js"{attrs}></script>\n' + scripts
+        connect = (f" {own}" if own else "") + (f" https://{gc}.goatcounter.com" if gc else "")
+        csp = csp.replace("connect-src 'self'", f"connect-src 'self'{connect}")
+        if gc:
+            csp = csp.replace("script-src 'self'", "script-src 'self' https://gc.zgo.at")
     html = html.replace('<script src="/static/app.js"></script>', scripts)
     html = html.replace('<meta charset="utf-8">',
                         f'<meta charset="utf-8">\n  <meta http-equiv="Content-Security-Policy" content="{csp}">\n'
@@ -143,6 +148,15 @@ def _goatcounter_code() -> str:
         print(f"GOATCOUNTER_CODE inválido ({code!r}); contador de acessos desligado")
         return ""
     return code
+
+
+def _contador_url() -> str:
+    """Endereço do contador próprio (ex.: https://contador.meudominio.com.br). Vazio = desligado."""
+    url = os.environ.get("CONTADOR_URL", "").strip().rstrip("/")
+    if url and not re.fullmatch(r"https://[a-z0-9.-]+\.[a-z]{2,}(:\d{2,5})?", url.lower()):
+        print(f"CONTADOR_URL inválido ({url!r}); use só o endereço https, sem caminho. Contador próprio desligado")
+        return ""
+    return url.lower()
 
 
 def _write(path: Path, data) -> None:

@@ -27,6 +27,8 @@
     leaf: P('<path d="M5 19c0-8 5-14 15-15-1 10-7 15-15 15z"/><path d="M5 19l7-7"/>'),
     globe: P('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/>'),
     box: P('<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/>'),
+    chart: P('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+    lock: P('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>'),
     wrench: P('<path d="M14.7 6.3a4 4 0 00-5.4 5.2L3 17.8V21h3.2l6.3-6.3a4 4 0 005.2-5.4l-2.6 2.6-2.4-.4-.4-2.4z"/>'),
   };
   // logotipos de categorias (imagem embutida: funciona no servidor local e no GitHub Pages)
@@ -277,6 +279,7 @@
       else if (path === "erp") await viewList(view, "erp", params);
       else if (path === "eventos") await viewEvents(view, params);
       else if (path === "fontes") await viewSources(view);
+      else if (path === "acessos" && CONTADOR) await viewAcessos(view, params);
       else await viewDashboard(view);
     } catch (e) {
       view.innerHTML = `<div class="empty">Não foi possível carregar: ${esc(e.message)}</div>`;
@@ -614,6 +617,159 @@
     });
   }
 
+  // ------------------------------------------------------------ acessos (contador próprio, só com login)
+  const CONTADOR = (document.querySelector("script[data-contador-url]")?.dataset.contadorUrl || "").replace(/\/$/, "");
+  const auth = {
+    get token() { return store.get("radar-contador-token", ""); },
+    get user() { return store.get("radar-contador-usuario", ""); },
+    save(t, u) { store.set("radar-contador-token", t); store.set("radar-contador-usuario", u); },
+    clear() { try { localStorage.removeItem("radar-contador-token"); localStorage.removeItem("radar-contador-usuario"); } catch { /* sem armazenamento */ } },
+  };
+  // "Acessos" aparece no menu só para quem está logado; os outros veem apenas o link discreto "Entrar"
+  function renderAuth() {
+    const box = $("#authNav");
+    if (!box) return;
+    if (!CONTADOR) { box.innerHTML = ""; return; }
+    box.innerHTML = auth.token
+      ? `<a href="#/acessos" class="nav-item" data-route="acessos" style="--c:#38bdf8">${icon("chart")}<span>Acessos</span></a>`
+      : "";
+    const credit = $("#loginLink");
+    if (credit) credit.hidden = !!auth.token;
+    markActive();
+  }
+  async function contadorApi(path, opts = {}) {
+    const headers = { ...(opts.headers || {}) };
+    if (auth.token) headers.Authorization = `Bearer ${auth.token}`;
+    let r;
+    try { r = await fetch(CONTADOR + path, { ...opts, headers, cache: "no-store" }); }
+    catch { const e = new Error("offline"); e.offline = true; throw e; }
+    const data = r.status === 204 ? {} : await r.json().catch(() => ({}));
+    if (!r.ok) { const e = new Error(data.erro || `Erro ${r.status}`); e.status = r.status; throw e; }
+    return data;
+  }
+  function viewLogin(view, msg = "") {
+    view.innerHTML = `
+      <div class="login-wrap"><form class="panel login" id="loginForm" autocomplete="on">
+        <div class="login-ico">${icon("lock")}</div>
+        <h1>Entrar</h1>
+        <p class="hint">Área restrita: os números de acesso do Radar aparecem só para quem tem login.</p>
+        <label>Usuário<input name="usuario" autocomplete="username" required autofocus></label>
+        <label>Senha<input name="senha" type="password" autocomplete="current-password" required></label>
+        <p class="login-err" id="loginErr" role="alert">${esc(msg)}</p>
+        <button class="btn btn-primary" type="submit">Entrar</button>
+      </form></div>`;
+    $("#loginForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(ev.target);
+      const btn = ev.target.querySelector("button"); btn.disabled = true; btn.textContent = "Entrando…";
+      try {
+        const r = await contadorApi("/login", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usuario: fd.get("usuario"), senha: fd.get("senha") }) });
+        auth.save(r.token, r.usuario);
+        renderAuth();
+        router();
+      } catch (e) {
+        $("#loginErr").textContent = e.offline ? "O servidor do contador não respondeu. Tente de novo em alguns minutos." : e.message;
+        btn.disabled = false; btn.textContent = "Entrar";
+      }
+    });
+  }
+  const ACC_PERIODS = [["1", "Hoje"], ["7", "7 dias"], ["30", "30 dias"], ["90", "90 dias"], ["365", "1 ano"]];
+  const COUNTRY = (() => { try { return new Intl.DisplayNames(["pt-BR"], { type: "region" }); } catch { return null; } })();
+  const flag = (cc) => (/^[A-Z]{2}$/.test(cc) ? String.fromCodePoint(...[...cc].map((c) => 0x1f1a5 + c.charCodeAt(0))) : "");
+  function pageName(p) {
+    const r = String(p || "").replace(/^#\/?/, "");
+    if (!r || r === "dashboard") return "Painel";
+    if (r.startsWith("c/")) return S.cats[r.slice(2)]?.name || r.slice(2);
+    return { todas: "Todas as notícias", erp: ERP.short, eventos: EV.name, fontes: "Fontes e coleta", acessos: "Acessos" }[r] || r;
+  }
+  const num = (n) => Number(n || 0).toLocaleString("pt-BR");
+  const plural = (n, um, varios) => `${num(n)} ${Number(n) === 1 ? um : varios}`;
+  function barList(title, rows, label = (x) => esc(x), unit = "visitantes") {
+    const max = Math.max(1, ...rows.map((r) => r.n));
+    const total = rows.reduce((a, r) => a + r.n, 0) || 1;
+    return `<div class="panel acc-list"><h3>${title}</h3>${rows.length ? `<ol>${rows.map((r) => `
+      <li title="${esc(num(r.n))} ${unit} · ${Math.round((r.n / total) * 100)}%"><span class="acc-bar" style="width:${(r.n / max) * 100}%"></span>
+      <span class="acc-name">${label(r.nome)}</span><span class="acc-n">${num(r.n)}</span></li>`).join("")}</ol>` : `<p class="hint">Sem dados no período.</p>`}</div>`;
+  }
+  // gráfico de colunas (uma série): visitantes por dia ou visitas por hora
+  function columns(points, { label, tip }) {
+    const max = Math.max(1, ...points.map((p) => p.v));
+    const step = Math.max(1, Math.ceil(points.length / 10));
+    return `<div class="acc-cols" style="--n:${points.length}">
+      <div class="acc-grid"><span>${num(max)}</span><span>${num(Math.round(max / 2))}</span><span>0</span></div>
+      <div class="acc-plot">${points.map((p, i) => `<div class="acc-col" tabindex="0" data-tip="${esc(tip(p))}"><i style="height:${(p.v / max) * 100}%"></i>
+        <b>${i % step === 0 || i === points.length - 1 ? esc(label(p)) : ""}</b></div>`).join("")}</div></div>`;
+  }
+  async function viewAcessos(view, params) {
+    if (!auth.token) { renderAuth(); return viewLogin(view); }
+    const dias = ACC_PERIODS.some(([v]) => v === params.get("dias")) ? params.get("dias") : "30";
+    let d;
+    try { d = await contadorApi(`/stats?dias=${dias}`); }
+    catch (e) {
+      if (e.status === 401) { auth.clear(); renderAuth(); return viewLogin(view, "Sua sessão terminou. Entre de novo."); }
+      if (e.offline) {
+        view.innerHTML = `<div class="page-head"><div><h1>Acessos</h1></div></div>
+          <div class="empty">O servidor do contador não respondeu agora (pode estar desligado ou sem internet).<br>O site continua funcionando normalmente; as visitas desse intervalo não são contadas.<br><br><button class="btn" id="accRetry">Tentar de novo</button></div>`;
+        $("#accRetry").addEventListener("click", router);
+        return;
+      }
+      throw e;
+    }
+    const fmtDay = (iso, opt) => new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", ...opt }).format(new Date(iso + "T12:00:00Z"));
+    const perLabel = ACC_PERIODS.find(([v]) => v === dias)[1];
+    const daily = d.por_dia.map((p) => ({ v: p.visitantes, p }));
+    const hourly = d.por_hora_hoje.map((v, h) => ({ v, h }));
+    view.innerHTML = `
+      <div class="page-head"><div><div class="eyebrow">Área restrita · ${esc(auth.user)}</div><h1>Acessos</h1>
+        <p>Visitas ao Radar publicado, contadas pelo seu servidor. Sem cookies e sem guardar IP; seus acessos com login não entram na conta.</p></div>
+        <button class="btn" id="logoutBtn">${icon("lock")}<span>Sair</span></button></div>
+      <div class="periods" role="radiogroup" aria-label="Período">
+        <span class="periods-label">Período</span>
+        ${ACC_PERIODS.map(([v, l]) => `<a class="period ${v === dias ? "on" : ""}" href="#/acessos?dias=${v}"><span>${l}</span></a>`).join("")}
+      </div>
+      <div class="kpis acc-kpis">
+        <div class="kpi"><div class="label">Agora no site</div><div class="value">${num(d.agora)}</div><div class="sub">visitantes nos últimos 5 min</div></div>
+        <div class="kpi"><div class="label">Hoje</div><div class="value">${num(d.hoje.visitantes)}</div><div class="sub">visitantes · ${num(d.hoje.visitas)} páginas vistas</div></div>
+        <div class="kpi"><div class="label">Ontem</div><div class="value">${num(d.ontem.visitantes)}</div><div class="sub">visitantes · ${num(d.ontem.visitas)} páginas vistas</div></div>
+        <div class="kpi"><div class="label">${dias === "1" ? "Hoje" : `Últimos ${perLabel}`}</div><div class="value">${num(d.periodo.visitantes)}</div><div class="sub">visitantes-dia · ${num(d.periodo.visitas)} páginas vistas</div></div>
+      </div>
+      <div class="panel acc-chart"><h3>${dias === "1" ? "Páginas vistas por hora (hoje)" : "Visitantes por dia"}</h3>
+        ${dias === "1"
+          ? columns(hourly, { label: (p) => `${p.h}h`, tip: (p) => `${p.h}h–${p.h + 1}h: ${plural(p.v, "página vista", "páginas vistas")}` })
+          : columns(daily, { label: (x) => fmtDay(x.p.dia, { day: "2-digit", month: "2-digit" }),
+              tip: (x) => `${fmtDay(x.p.dia, { weekday: "short", day: "2-digit", month: "short" })}: ${plural(x.p.visitantes, "visitante", "visitantes")} · ${plural(x.p.visitas, "página vista", "páginas vistas")}` })}
+        <div class="acc-tip" id="accTip" hidden></div>
+        ${d.primeiro_registro ? `<p class="hint">Contando desde ${fmtDay(d.primeiro_registro, { dateStyle: "long" })}.</p>` : `<p class="hint">Nenhuma visita registrada ainda.</p>`}
+      </div>
+      <div class="acc-lists">
+        ${barList("Abas mais abertas", d.paginas, (p) => esc(pageName(p)), "páginas vistas")}
+        ${barList("De onde vieram", d.origens)}
+        ${barList("Tipo de origem", d.tipos_origem)}
+        ${barList("Aparelho", d.aparelhos)}
+        ${barList("País", d.paises, (cc) => (cc === "??" ? "Não identificado" : `${flag(cc)} ${esc(COUNTRY?.of(cc) || cc)}`))}
+        ${barList("Navegador", d.navegadores)}
+        ${barList("Sistema", d.sistemas)}
+      </div>`;
+    $("#logoutBtn").addEventListener("click", async () => {
+      await contadorApi("/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => null);
+      auth.clear(); renderAuth(); location.hash = "#/";
+    });
+    const tipEl = $("#accTip");
+    const plot = view.querySelector(".acc-plot");
+    const showTip = (col) => {
+      if (!col) { tipEl.hidden = true; return; }
+      const pr = view.querySelector(".acc-chart").getBoundingClientRect(), cr = col.querySelector("i").getBoundingClientRect();
+      tipEl.textContent = col.dataset.tip; tipEl.hidden = false;
+      const x = Math.min(Math.max(cr.left + cr.width / 2 - pr.left - tipEl.offsetWidth / 2, 0), pr.width - tipEl.offsetWidth);
+      tipEl.style.left = `${x}px`; tipEl.style.top = `${Math.max(cr.top - pr.top - tipEl.offsetHeight - 6, 0)}px`;
+    };
+    plot.addEventListener("mouseover", (e) => showTip(e.target.closest(".acc-col")));
+    plot.addEventListener("focusin", (e) => showTip(e.target.closest(".acc-col")));
+    plot.addEventListener("mouseleave", () => showTip(null));
+    plot.addEventListener("focusout", () => showTip(null));
+  }
+
   // ------------------------------------------------------------ status e atualização
   async function pollStatus() {
     clearTimeout(pollStatus._t);
@@ -650,6 +806,7 @@
 
   async function init() {
     hydrateIcons();
+    renderAuth();
     applyTheme(store.get("radar-theme", ""));
     $("#themeBtn").addEventListener("click", () => {
       const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
