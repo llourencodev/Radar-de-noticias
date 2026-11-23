@@ -280,6 +280,7 @@
       else if (path === "eventos") await viewEvents(view, params);
       else if (path === "fontes") await viewSources(view);
       else if (path === "acessos" && CONTADOR) await viewAcessos(view, params);
+      else if (path === "privacidade" && CONTADOR) viewPrivacy(view);
       else await viewDashboard(view);
     } catch (e) {
       view.innerHTML = `<div class="empty">Não foi possível carregar: ${esc(e.message)}</div>`;
@@ -635,7 +636,33 @@
       : "";
     const credit = $("#loginLink");
     if (credit) credit.hidden = !!auth.token;
+    const priv = $("#privacyLink");
+    if (priv) priv.hidden = false;
     markActive();
+  }
+  // aviso de privacidade (LGPD): o que o contador registra e por quanto tempo
+  function viewPrivacy(view) {
+    const repo = S.meta?.repo ? `https://github.com/${esc(S.meta.repo)}` : "";
+    view.innerHTML = `
+      <div class="page-head"><div><h1>Privacidade</h1><p>Como o Radar registra as visitas.</p></div></div>
+      <div class="panel privacy">
+        <p>Para saber quantas pessoas usam o Radar e o que é mais útil, cada página aberta é registrada num servidor próprio do responsável pelo site. Nada é vendido nem repassado a terceiros, e não há cookies de publicidade.</p>
+        <h3>O que é registrado</h3>
+        <ul>
+          <li>Endereço IP, data e hora da visita.</li>
+          <li>Aba aberta (Fiscal, IA, Eventos...) e o texto pesquisado na busca do Radar.</li>
+          <li>Site de onde você veio e, se houver, a campanha do link.</li>
+          <li>Navegador, sistema, tipo de aparelho, tamanho da tela e da janela, idioma, fuso horário e tipo de conexão.</li>
+          <li>Tempo em que a página ficou aberta.</li>
+          <li>Um código aleatório guardado no seu navegador, para reconhecer visitas de volta. Ele não contém dados seus e pode ser apagado limpando os dados do site.</li>
+        </ul>
+        <h3>Por quanto tempo</h3>
+        <p>O IP é apagado depois de 90 dias. Os demais dados das visitas ficam por até 400 dias e depois são apagados.</p>
+        <h3>Para que</h3>
+        <p>Somente para estatísticas de uso, segurança e melhoria do Radar (legítimo interesse, art. 7º, IX da LGPD).</p>
+        <h3>Seus direitos</h3>
+        <p>Você pode pedir acesso ou exclusão dos registros das suas visitas${repo ? ` pelo <a href="${repo}" target="_blank" rel="noopener noreferrer">repositório do projeto no GitHub</a>` : " ao responsável pelo site"}.</p>
+      </div>`;
   }
   async function contadorApi(path, opts = {}) {
     const headers = { ...(opts.headers || {}) };
@@ -681,9 +708,11 @@
     const r = String(p || "").replace(/^#\/?/, "");
     if (!r || r === "dashboard") return "Painel";
     if (r.startsWith("c/")) return S.cats[r.slice(2)]?.name || r.slice(2);
-    return { todas: "Todas as notícias", erp: ERP.short, eventos: EV.name, fontes: "Fontes e coleta", acessos: "Acessos" }[r] || r;
+    return { todas: "Todas as notícias", erp: ERP.short, eventos: EV.name, fontes: "Fontes e coleta", acessos: "Acessos", privacidade: "Privacidade" }[r] || r;
   }
   const num = (n) => Number(n || 0).toLocaleString("pt-BR");
+  const dur = (sec) => (sec == null ? "—" : sec < 60 ? `${sec}s` : sec < 3600 ? `${Math.floor(sec / 60)}min ${String(sec % 60).padStart(2, "0")}s` : `${Math.floor(sec / 3600)}h ${String(Math.floor((sec % 3600) / 60)).padStart(2, "0")}min`);
+  const whenFull = (iso) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
   const plural = (n, um, varios) => `${num(n)} ${Number(n) === 1 ? um : varios}`;
   function barList(title, rows, label = (x) => esc(x), unit = "visitantes") {
     const max = Math.max(1, ...rows.map((r) => r.n));
@@ -700,6 +729,86 @@
       <div class="acc-grid"><span>${num(max)}</span><span>${num(Math.round(max / 2))}</span><span>0</span></div>
       <div class="acc-plot">${points.map((p, i) => `<div class="acc-col" tabindex="0" data-tip="${esc(tip(p))}"><i style="height:${(p.v / max) * 100}%"></i>
         <b>${i % step === 0 || i === points.length - 1 ? esc(label(p)) : ""}</b></div>`).join("")}</div></div>`;
+  }
+  function recurrence(d, perLabel, fmtDay) {
+    const r = d.recorrencia || { pessoas: 0, novos: 0, recorrentes: 0, voltaram_no_periodo: 0, frequencia: [] };
+    const per = d.dias === 1 ? "hoje" : `nos últimos ${perLabel}`;
+    const pct = (n) => (r.pessoas ? ` · ${Math.round((n / r.pessoas) * 100)}%` : "");
+    const when = (iso) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+    const rows = (d.frequentes || []).map((f) => `<tr class="click" data-pessoa="${esc(f.pessoa)}" title="Ver tudo deste visitante">
+        <td class="mono">${f.ip ? esc(f.ip) : `<span class="hint" title="IP apagado após ${num(d.dias_ip)} dias">apagado</span>`}</td>
+        <td class="n">${num(f.dias)}</td><td class="n">${num(f.visitas)}</td><td class="n">${num(f.total_dias)}</td>
+        <td>${fmtDay(f.primeira, { day: "2-digit", month: "2-digit", year: "2-digit" })}</td><td>${when(f.ultima)}</td>
+        <td>${esc(f.aparelho)} · ${esc(f.navegador)} · ${esc(f.sistema)}</td>
+        <td>${f.pais === "??" ? "—" : `${flag(f.pais)} ${esc(f.pais)}`}</td>
+        <td class="wrap">${(f.top_paginas || []).map((p) => `${esc(pageName(p.nome))} <span class="hint">${num(p.n)}</span>`).join(", ")}</td></tr>`).join("");
+    return `
+      <div class="section-head acc-sub"><h2>Recorrência</h2></div>
+      <div class="kpis">
+        <div class="kpi"><div class="label">Pessoas</div><div class="value">${num(r.pessoas)}</div><div class="sub">visitantes diferentes ${per}</div></div>
+        <div class="kpi"><div class="label">Novos</div><div class="value">${num(r.novos)}</div><div class="sub">primeira visita ${per}${pct(r.novos)}</div></div>
+        <div class="kpi"><div class="label">Recorrentes</div><div class="value">${num(r.recorrentes)}</div><div class="sub">já tinham vindo antes${pct(r.recorrentes)}</div></div>
+        <div class="kpi"><div class="label">Voltaram</div><div class="value">${num(r.voltaram_no_periodo)}</div><div class="sub">vieram em mais de um dia ${per}</div></div>
+      </div>
+      <div class="acc-two">
+        ${barList("Quantos dias cada pessoa veio", r.frequencia, (x) => esc(x), "pessoas")}
+        <div class="panel acc-table acc-wide"><h3>Visitantes frequentes</h3>
+          ${rows ? `<div class="acc-scroll"><table>
+            <thead><tr><th>IP (último)</th><th class="n" title="Dias com visita no período">Dias</th><th class="n" title="Páginas vistas no período">Páginas</th><th class="n" title="Dias com visita desde o início">Total</th><th>1ª visita</th><th>Última</th><th>Aparelho</th><th>País</th><th>Mais acessa</th></tr></thead>
+            <tbody>${rows}</tbody></table></div>${moreBtn((d.frequentes || []).length, 12)}
+            <p class="hint">Clique numa linha para ver tudo do visitante. A mesma pessoa é reconhecida pelo navegador, mesmo trocando de rede; outro navegador ou aparelho conta como outra pessoa.</p>`
+          : `<p class="hint">Sem dados no período.</p>`}
+        </div>
+      </div>`;
+  }
+  const moreBtn = (total, shown) => (total > shown ? `<button class="btn acc-more" data-shown="${shown}">Ver todos (${num(total)})</button>` : "");
+  function collapseTables(root) {
+    root.querySelectorAll(".acc-more").forEach((btn) => {
+      const rows = [...btn.closest(".panel, .acc-table").querySelectorAll("tbody tr")];
+      rows.forEach((tr, i) => { tr.hidden = i >= Number(btn.dataset.shown); });
+      btn.addEventListener("click", () => { rows.forEach((tr) => { tr.hidden = false; }); btn.remove(); });
+    });
+  }
+  function visitRow(v) {
+    const origem = v.campanha ? `${esc(v.origem)} <span class="hint">(${esc(v.campanha)})</span>` : esc(v.origem);
+    return `<tr class="click" data-pessoa="${esc(v.pessoa)}" title="${esc(v.ua)}">
+      <td>${whenFull(v.quando)}</td><td class="mono">${v.ip ? esc(v.ip) : "—"}</td><td>${esc(pageName(v.pagina))}</td>
+      <td>${v.busca ? `“${esc(v.busca)}”` : ""}</td>
+      <td>${v.ref_url ? `<span title="${esc(v.ref_url)}">${origem}</span>` : origem}</td>
+      <td>${esc(v.versao || "")} · ${esc(v.sistema)} · ${esc(v.aparelho)}</td>
+      <td>${v.pais === "??" ? "—" : `${flag(v.pais)} ${esc(v.pais)}`}</td><td>${esc((v.idioma || "").split(",")[0])}</td>
+      <td>${esc(v.tela || "")}</td><td class="n">${dur(v.duracao)}</td></tr>`;
+  }
+  async function openVisitor(pessoa, dias) {
+    let v;
+    try { v = await contadorApi(`/visitante?id=${encodeURIComponent(pessoa)}&dias=${Math.max(Number(dias), 90)}`); }
+    catch (e) { toast(e.message); return; }
+    $("#modalBody").innerHTML = `<div class="inner acc-visitor" style="padding-top:20px">
+      <button class="icon-btn close" id="closeModal" aria-label="Fechar">${icon("close")}</button>
+      <div class="eyebrow">Visitante ${esc(v.pessoa.slice(0, 8))}</div>
+      <h2>${v.ips[0] ? esc(v.ips[0].nome) : "IP apagado"}</h2>
+      <p class="hint">Primeira visita ${whenFull(v.primeira)} · última ${whenFull(v.ultima)}</p>
+      <div class="kpis acc-mini">
+        <div class="kpi"><div class="label">Páginas vistas</div><div class="value">${num(v.visitas)}</div></div>
+        <div class="kpi"><div class="label">Dias com visita</div><div class="value">${num(v.dias_com_visita)}</div></div>
+        <div class="kpi"><div class="label">Tempo total</div><div class="value small">${dur(v.tempo_total)}</div></div>
+        <div class="kpi"><div class="label">Tempo por página</div><div class="value small">${dur(v.tempo_medio)}</div></div>
+      </div>
+      <div class="acc-lists">
+        ${barList(`Abas que mais acessa (${v.dias} dias)`, v.paginas, (p) => esc(pageName(p)), "páginas vistas")}
+        ${barList("O que pesquisou", v.buscas, (x) => esc(x), "buscas")}
+        ${barList("De onde veio", v.origens, (x) => esc(x), "páginas vistas")}
+        ${barList("Aparelhos e navegadores", v.aparelhos, (x) => esc(x), "páginas vistas")}
+        ${barList("IPs usados", v.ips, (x) => `<span class="mono">${esc(x)}</span>`, "páginas vistas")}
+      </div>
+      <h4>Histórico (${num(v.historico.length)} mais recentes)</h4>
+      <div class="acc-table"><div class="acc-scroll"><table>
+        <thead><tr><th>Quando</th><th>IP</th><th>Aba</th><th>Busca</th><th>De onde veio</th><th>Aparelho</th><th>País</th><th>Idioma</th><th>Tela</th><th class="n">Tempo</th></tr></thead>
+        <tbody>${v.historico.map(visitRow).join("")}</tbody></table></div>${moreBtn(v.historico.length, 20)}</div>
+    </div>`;
+    collapseTables($("#modalBody"));
+    $("#closeModal").addEventListener("click", () => $("#modal").close());
+    $("#modal").showModal();
   }
   async function viewAcessos(view, params) {
     if (!auth.token) { renderAuth(); return viewLogin(view); }
@@ -722,14 +831,15 @@
     const hourly = d.por_hora_hoje.map((v, h) => ({ v, h }));
     view.innerHTML = `
       <div class="page-head"><div><div class="eyebrow">Área restrita · ${esc(auth.user)}</div><h1>Acessos</h1>
-        <p>Visitas ao Radar publicado, contadas pelo seu servidor. Sem cookies e sem guardar IP; seus acessos com login não entram na conta.</p></div>
-        <button class="btn" id="logoutBtn">${icon("lock")}<span>Sair</span></button></div>
+        <p>Visitas ao Radar publicado, contadas pelo seu servidor. Sem cookies; o IP fica guardado por ${num(d.dias_ip)} dias. Seus acessos com login não entram na conta.</p></div>
+        <div class="acc-actions"><button class="btn" id="exportBtn" title="Baixar todas as visitas do período (abre no Excel)">Exportar CSV</button>
+        <button class="btn" id="logoutBtn">${icon("lock")}<span>Sair</span></button></div></div>
       <div class="periods" role="radiogroup" aria-label="Período">
         <span class="periods-label">Período</span>
         ${ACC_PERIODS.map(([v, l]) => `<a class="period ${v === dias ? "on" : ""}" href="#/acessos?dias=${v}"><span>${l}</span></a>`).join("")}
       </div>
       <div class="kpis acc-kpis">
-        <div class="kpi"><div class="label">Agora no site</div><div class="value">${num(d.agora)}</div><div class="sub">visitantes nos últimos 5 min</div></div>
+        <div class="kpi"><div class="label">Agora no site</div><div class="value">${num(d.agora)}</div><div class="sub">visitantes nos últimos 5 min · tempo médio por página ${dur(d.tempo_medio)}</div></div>
         <div class="kpi"><div class="label">Hoje</div><div class="value">${num(d.hoje.visitantes)}</div><div class="sub">visitantes · ${num(d.hoje.visitas)} páginas vistas</div></div>
         <div class="kpi"><div class="label">Ontem</div><div class="value">${num(d.ontem.visitantes)}</div><div class="sub">visitantes · ${num(d.ontem.visitas)} páginas vistas</div></div>
         <div class="kpi"><div class="label">${dias === "1" ? "Hoje" : `Últimos ${perLabel}`}</div><div class="value">${num(d.periodo.visitantes)}</div><div class="sub">visitantes-dia · ${num(d.periodo.visitas)} páginas vistas</div></div>
@@ -742,6 +852,7 @@
         <div class="acc-tip" id="accTip" hidden></div>
         ${d.primeiro_registro ? `<p class="hint">Contando desde ${fmtDay(d.primeiro_registro, { dateStyle: "long" })}.</p>` : `<p class="hint">Nenhuma visita registrada ainda.</p>`}
       </div>
+      ${recurrence(d, perLabel, fmtDay)}
       <div class="acc-lists">
         ${barList("Abas mais abertas", d.paginas, (p) => esc(pageName(p)), "páginas vistas")}
         ${barList("De onde vieram", d.origens)}
@@ -750,7 +861,29 @@
         ${barList("País", d.paises, (cc) => (cc === "??" ? "Não identificado" : `${flag(cc)} ${esc(COUNTRY?.of(cc) || cc)}`))}
         ${barList("Navegador", d.navegadores)}
         ${barList("Sistema", d.sistemas)}
+        ${barList("Versão do navegador", d.versoes || [])}
+        ${barList("Buscas feitas no Radar", d.buscas || [], (x) => esc(x), "buscas")}
+        ${barList("Campanhas (links com utm)", d.campanhas || [])}
+        ${barList("Idioma do navegador", d.idiomas || [])}
+        ${barList("Resolução da tela", d.telas || [])}
+      </div>
+      <div class="panel acc-table"><h3>Últimas visitas</h3>
+        ${(d.ultimas || []).length ? `<div class="acc-scroll"><table>
+          <thead><tr><th>Quando</th><th>IP</th><th>Aba</th><th>Busca</th><th>De onde veio</th><th>Aparelho</th><th>País</th><th>Idioma</th><th>Tela</th><th class="n">Tempo</th></tr></thead>
+          <tbody>${d.ultimas.map(visitRow).join("")}</tbody></table></div>${moreBtn(d.ultimas.length, 15)}` : `<p class="hint">Nenhuma visita registrada ainda.</p>`}
       </div>`;
+    collapseTables(view);
+    view.querySelectorAll("tr[data-pessoa]").forEach((tr) => tr.addEventListener("click", () => openVisitor(tr.dataset.pessoa, dias)));
+    $("#exportBtn").addEventListener("click", async () => {
+      try {
+        const r = await fetch(`${CONTADOR}/exportar?dias=${dias}`, { headers: { Authorization: `Bearer ${auth.token}` } });
+        if (!r.ok) throw new Error(`Erro ${r.status}`);
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(await r.blob());
+        a.download = `acessos-radar-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      } catch (e) { toast(`Não foi possível exportar: ${e.message}`); }
+    });
     $("#logoutBtn").addEventListener("click", async () => {
       await contadorApi("/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => null);
       auth.clear(); renderAuth(); location.hash = "#/";

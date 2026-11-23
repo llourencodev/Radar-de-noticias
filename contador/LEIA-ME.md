@@ -5,8 +5,14 @@ Os números aparecem na aba **Acessos** do próprio Radar, que só aparece depoi
 
 - Só Python 3 (já vem no Ubuntu); nenhuma biblioteca extra.
 - As visitas ficam num arquivo SQLite no servidor (`/var/lib/radar-contador/acessos.db`).
-- Sem cookies e sem guardar IP: cada visitante vira um código embaralhado que muda todo dia (LGPD).
-- Seus acessos com login não entram na conta.
+- Guarda os detalhes de cada visita: IP, aba aberta, busca feita, de onde veio (e campanha utm), navegador e versão,
+  sistema, aparelho, tela, janela, idioma, fuso, conexão e tempo com a página aberta.
+- Reconhece quem volta (por um código aleatório guardado no navegador, ou IP + navegador) e mostra novos x
+  recorrentes, os visitantes mais frequentes, as abas que cada um mais acessa e o histórico de cada visitante.
+- Botão **Exportar CSV** baixa todas as visitas do período (abre no Excel).
+- O IP é apagado depois de 90 dias (`CONTADOR_DIAS_IP`); as visitas, depois de 400 (`CONTADOR_DIAS`).
+- O site ganha a página **Privacidade** (link no rodapé do menu) explicando o que é registrado, como pede a LGPD.
+- Sem cookies. Seus acessos com login não entram na conta.
 - Se o servidor cair, o site continua normal; só as visitas desse intervalo deixam de ser contadas.
 
 ```
@@ -71,8 +77,9 @@ No Radar, clique em **Entrar** (embaixo do seu nome, no menu lateral) ou abra `.
 Depois do login, a aba **Acessos** aparece no menu daquele navegador por 30 dias.
 
 O painel mostra: visitantes agora, hoje, ontem e no período (hoje, 7, 30, 90 dias, 1 ano); visitantes por dia
-(ou páginas por hora, hoje); abas mais abertas; de onde vieram (Google, WhatsApp, LinkedIn...);
-celular, computador ou tablet; país; navegador e sistema.
+(ou páginas por hora, hoje); recorrência (novos, recorrentes, quantos dias cada pessoa veio); visitantes frequentes
+com IP e as abas que mais acessam (clique para ver o histórico completo); últimas visitas; abas mais abertas;
+buscas feitas; de onde vieram; campanhas; aparelho, país, navegador e versão, sistema, idioma e tela.
 
 ## Comandos úteis
 
@@ -84,7 +91,11 @@ celular, computador ou tablet; país; navegador e sistema.
 | Cópia de segurança das visitas | `sudo cp /var/lib/radar-contador/acessos.db ~/acessos-backup.db` |
 | Mudar opções (dias guardados, site permitido) | editar `/etc/radar-contador.env` e `sudo systemctl restart radar-contador` |
 
-## Segurança
+## Segurança e LGPD
+
+- O IP é dado pessoal: por isso o site mostra a página **Privacidade** e o IP é apagado em 90 dias.
+  Se alguém pedir a exclusão dos próprios dados, apague as linhas com o IP dela:
+  `sudo sqlite3 /var/lib/radar-contador/acessos.db "DELETE FROM hits WHERE ip='1.2.3.4'"` (precisa do pacote `sqlite3`).
 
 - A senha fica só como hash (PBKDF2, 600 mil rodadas) em `/etc/radar-contador.env`, legível só pelo root.
 - Depois de 5 senhas erradas, o mesmo IP fica bloqueado por 15 minutos.

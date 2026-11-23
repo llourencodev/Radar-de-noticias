@@ -100,7 +100,7 @@ IA opcional, sem expor a chave: em **Settings › Secrets and variables › Acti
 
 ### Contador de acessos
 
-**Contador próprio (no seu servidor):** a pasta `contador/` tem um serviço pequeno que roda num servidor Ubuntu e guarda as visitas num SQLite. Os números aparecem na aba **Acessos** do Radar, que só aparece para quem entra com usuário e senha (link **Entrar** no menu lateral). Sem cookies e sem guardar IP. Passo a passo em [contador/LEIA-ME.md](contador/LEIA-ME.md); depois de instalar, crie no GitHub a variável `CONTADOR_URL` com o endereço do contador.
+**Contador próprio (no seu servidor):** a pasta `contador/` tem um serviço pequeno que roda num servidor Ubuntu e guarda as visitas num SQLite. Os números aparecem na aba **Acessos** do Radar, que só aparece para quem entra com usuário e senha (link **Entrar** no menu lateral). Guarda IP, busca, origem, aparelho e tempo de cada visita, mostra visitantes recorrentes e o que cada um mais acessa, e exporta CSV; o site ganha uma página de Privacidade (LGPD). Passo a passo em [contador/LEIA-ME.md](contador/LEIA-ME.md); depois de instalar, crie no GitHub a variável `CONTADOR_URL` com o endereço do contador.
 
 Só são contados acessos a partir da ativação: o GitHub Pages não guarda registro de visitas. A versão local (`iniciar.bat`) não envia nada.
 

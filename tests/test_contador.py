@@ -86,13 +86,69 @@ class ContadorTest(unittest.TestCase):
         self.assertEqual({o["nome"] for o in st["origens"]}, {"Google", "WhatsApp"})
         self.assertEqual({a["nome"]: a["n"] for a in st["aparelhos"]}, {"Computador": 1, "Celular": 1})
         self.assertEqual(st["paises"], [{"nome": "BR", "n": 2}])
+        self.assertEqual(st["recorrencia"]["pessoas"], 2)
         self.assertEqual(st["agora"], 2)
 
-    def test_nao_guarda_ip(self):
-        self.visita(ip="203.0.113.77")
-        linhas = self.srv._db.execute("SELECT * FROM hits").fetchall()
-        self.assertEqual(len(linhas), 1)
-        self.assertNotIn("203.0.113.77", json.dumps(linhas))
+    def test_guarda_ip_e_detalhes(self):
+        self.pedir("/hit", {"p": "#/c/fiscal?q=icms", "q": "icms", "u": ORIGEM + "/", "r": "https://www.google.com/search",
+                            "w": 1920, "h": 1080, "vw": 1500, "vh": 900, "lang": "pt-BR,en", "tz": "America/Sao_Paulo",
+                            "c": "4g", "cid": "a" * 36, "v": "pv1", "us": "newsletter", "um": "email", "uc": "nov"},
+                   headers={"CF-Connecting-IP": "203.0.113.77"})
+        cols = [r[1] for r in self.srv._db.execute("PRAGMA table_info(hits)")]
+        linha = dict(zip(cols, self.srv._db.execute("SELECT * FROM hits").fetchone()))
+        self.assertEqual(linha["ip"], "203.0.113.77")
+        self.assertEqual((linha["busca"], linha["tela"], linha["janela"], linha["idioma"], linha["conexao"]),
+                         ("icms", "1920x1080", "1500x900", "pt-BR,en", "4g"))
+        self.assertEqual(linha["campanha"], "newsletter / email / nov")
+        self.assertEqual(linha["versao"], "Chrome 130")
+        self.assertEqual(linha["pagina"], "#/c/fiscal")
+        # tempo na página chega depois, quando o visitante sai
+        self.pedir("/hit", {"t": "fim", "v": "pv1", "s": 42})
+        self.pedir("/hit", {"t": "fim", "v": "pv1", "s": 8})
+        self.assertEqual(self.srv._db.execute("SELECT duracao FROM hits").fetchone()[0], 50)
+        self.assertEqual(self.srv._db.execute("SELECT COUNT(*) FROM hits").fetchone()[0], 1)
+
+    def test_ip_apagado_depois_do_prazo(self):
+        self.visita(ip="198.51.100.1")
+        self.srv._db.execute("UPDATE hits SET dia='2000-01-01'")
+        self.srv._ultima_limpeza = ""
+        with mock.patch.object(self.srv, "DIAS_GUARDADOS", 100000):
+            self.visita(ip="198.51.100.2")
+        ips = sorted(r[0] for r in self.srv._db.execute("SELECT ip FROM hits"))
+        self.assertEqual(ips, ["", "198.51.100.2"])
+        self.assertEqual(self.srv._db.execute("SELECT COUNT(*) FROM hits WHERE pessoa=''").fetchone()[0], 0)
+
+    def test_recorrencia_visitante_e_exportacao(self):
+        cid = "b" * 36
+        # a mesma pessoa (mesmo navegador) volta em outro dia e de outra rede
+        self.pedir("/hit", {"p": "#/c/ia", "u": ORIGEM + "/", "cid": cid}, headers={"CF-Connecting-IP": "10.0.0.1"})
+        self.srv._db.execute("UPDATE hits SET dia = date(dia, '-3 day')")
+        self.pedir("/hit", {"p": "#/c/ia", "u": ORIGEM + "/", "cid": cid}, headers={"CF-Connecting-IP": "10.0.0.2"})
+        self.pedir("/hit", {"p": "#/erp", "u": ORIGEM + "/", "cid": cid, "q": "nfe"}, headers={"CF-Connecting-IP": "10.0.0.2"})
+        self.visita(ip="10.9.9.9")  # outra pessoa, nova
+        auth = {"Authorization": "Bearer " + self.login()[1]["token"]}
+        st = self.pedir("/stats?dias=1", headers=auth)[1]
+        self.assertEqual(st["recorrencia"]["pessoas"], 2)
+        self.assertEqual(st["recorrencia"]["recorrentes"], 1)
+        self.assertEqual(st["recorrencia"]["novos"], 1)
+        freq = next(f for f in st["frequentes"] if f["ip"] == "10.0.0.2")
+        self.assertEqual(freq["total_dias"], 2)
+        self.assertEqual(freq["top_paginas"][0], {"nome": "#/c/ia", "n": 1})
+        self.assertEqual(len(st["ultimas"]), 4)
+        self.assertEqual(st["buscas"], [{"nome": "nfe", "n": 1}])
+        cod, v, _ = self.pedir(f"/visitante?id={freq['pessoa']}&dias=30", headers=auth)
+        self.assertEqual(cod, 200)
+        self.assertEqual((v["visitas"], v["dias_com_visita"]), (3, 2))
+        self.assertEqual({i["nome"] for i in v["ips"]}, {"10.0.0.1", "10.0.0.2"})
+        self.assertEqual(v["paginas"][0], {"nome": "#/c/ia", "n": 2})
+        self.assertEqual(self.pedir("/visitante?id=nada", headers=auth)[0], 404)
+        self.assertEqual(self.pedir("/visitante?id=" + freq["pessoa"])[0], 401)
+        req = urllib.request.Request(self.base + "/exportar?dias=30", headers={"Origin": ORIGEM, **auth})
+        with urllib.request.urlopen(req) as r:
+            csv_txt = r.read().decode("utf-8-sig")
+        self.assertTrue(csv_txt.startswith("quando;pessoa;ip;pagina;busca"))
+        self.assertIn("10.0.0.1", csv_txt)
+        self.assertEqual(self.pedir("/exportar")[0], 401)
 
     def test_recusa_outros_sites(self):
         self.assertEqual(self.pedir("/hit", {"p": "#/"}, origem="https://malicioso.example")[0], 403)
