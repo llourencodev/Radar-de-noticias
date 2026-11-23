@@ -4,9 +4,9 @@
 Roda no servidor caseiro e guarda as visitas num arquivo SQLite. O site publicado (GitHub Pages)
 avisa cada abertura de página; a aba "Acessos" do Radar lê os totais.
 
-Privacidade (LGPD): não usa cookies e não guarda IP nem identificador do navegador. O visitante
-é reconhecido só dentro do mesmo dia, por um código embaralhado (hash) de IP + navegador com uma
-chave que é trocada todo dia e apagada em seguida; não dá para voltar ao IP nem ligar dias diferentes.
+Privacidade (LGPD): não usa cookies. Guarda o IP de cada visita para mostrar visitantes recorrentes
+no painel (só para quem tem login). O IP é apagado depois de CONTADOR_DIAS_IP dias (padrão 90); a
+recorrência continua funcionando com um código embaralhado (hash) de IP + navegador.
 
 Endereços:
   POST /hit     registra uma visita (chamado pelo site; corpo JSON pequeno)
@@ -48,6 +48,7 @@ ENV_PATH = os.environ.get("CONTADOR_ENV", "/etc/radar-contador.env")
 TENTATIVAS_MAX = 5          # tentativas de login erradas por IP...
 TENTATIVAS_JANELA = 15 * 60  # ...a cada 15 minutos
 DIAS_GUARDADOS = int(os.environ.get("CONTADOR_DIAS", "400"))  # visitas mais antigas são apagadas
+DIAS_IP = int(os.environ.get("CONTADOR_DIAS_IP", "90"))         # depois disso o IP some (fica só o código do visitante)
 TZ = ZoneInfo(os.environ.get("CONTADOR_FUSO", "America/Sao_Paulo"))
 LIMITE_POR_HORA = 300                                          # visitas por visitante por hora (evita abuso)
 MAX_CORPO = 2048
@@ -56,7 +57,7 @@ ONLINE_MIN = 5  # "agora no site" = visitas nos últimos 5 minutos
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS hits (
-  id INTEGER PRIMARY KEY,
+  id INTEGER PRIMARY KEY,  -- mais colunas em COLUNAS_EXTRAS
   ts INTEGER NOT NULL,            -- segundos desde 1970 (UTC)
   dia TEXT NOT NULL,              -- AAAA-MM-DD no fuso configurado
   hora INTEGER NOT NULL,
@@ -71,10 +72,29 @@ CREATE TABLE IF NOT EXISTS hits (
   pais TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS hits_dia ON hits(dia);
+CREATE TABLE IF NOT EXISTS config (chave TEXT PRIMARY KEY, valor TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS hits_ts ON hits(ts);
 CREATE TABLE IF NOT EXISTS sal (dia TEXT PRIMARY KEY, valor TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS sessoes (token_hash TEXT PRIMARY KEY, criada INTEGER NOT NULL, expira INTEGER NOT NULL);
 """
+
+# dados detalhados de cada visita (para o painel de gestão; só quem tem login vê)
+COLUNAS_EXTRAS = [
+    ("ip", "TEXT NOT NULL DEFAULT ''"),        # apagado depois de CONTADOR_DIAS_IP dias
+    ("pessoa", "TEXT NOT NULL DEFAULT ''"),    # código fixo do visitante (navegador ou IP + navegador)
+    ("pv", "TEXT NOT NULL DEFAULT ''"),        # código da página vista (para somar o tempo na página)
+    ("duracao", "INTEGER"),                    # segundos com a página visível
+    ("ua", "TEXT NOT NULL DEFAULT ''"),        # identificação completa do navegador
+    ("versao", "TEXT NOT NULL DEFAULT ''"),    # navegador com versão (ex.: Chrome 130)
+    ("idioma", "TEXT NOT NULL DEFAULT ''"),
+    ("fuso", "TEXT NOT NULL DEFAULT ''"),
+    ("tela", "TEXT NOT NULL DEFAULT ''"),      # resolução da tela (1920x1080)
+    ("janela", "TEXT NOT NULL DEFAULT ''"),    # tamanho da janela do navegador
+    ("conexao", "TEXT NOT NULL DEFAULT ''"),   # 4g, 3g... (quando o navegador informa)
+    ("ref_url", "TEXT NOT NULL DEFAULT ''"),   # endereço completo de onde veio
+    ("campanha", "TEXT NOT NULL DEFAULT ''"),  # utm_source / utm_medium / utm_campaign
+    ("busca", "TEXT NOT NULL DEFAULT ''"),     # o que foi pesquisado no Radar
+]
 
 _lock = threading.Lock()
 _db = None
@@ -89,6 +109,12 @@ def conectar(path=None):
     _db = sqlite3.connect(path or DB_PATH, check_same_thread=False, isolation_level=None)
     _db.execute("PRAGMA journal_mode=WAL")
     _db.executescript(SCHEMA)
+    colunas = {r[1] for r in _db.execute("PRAGMA table_info(hits)")}
+    for nome, tipo in COLUNAS_EXTRAS:  # bancos criados por versões anteriores ganham as colunas novas
+        if nome not in colunas:
+            _db.execute(f"ALTER TABLE hits ADD COLUMN {nome} {tipo}")
+    _db.execute("CREATE INDEX IF NOT EXISTS hits_pv ON hits(pv)")
+    _db.execute("CREATE INDEX IF NOT EXISTS hits_pessoa ON hits(pessoa)")
     _vistos.clear()
     _contagem.clear()
     return _db
@@ -109,6 +135,15 @@ def _sal(dia):
     return _db.execute("SELECT valor FROM sal WHERE dia=?", (dia,)).fetchone()[0]
 
 
+def _sal_fixo():
+    """Chave permanente para o código do visitante (reconhece a mesma pessoa em dias diferentes)."""
+    row = _db.execute("SELECT valor FROM config WHERE chave='sal_pessoa'").fetchone()
+    if row:
+        return row[0]
+    _db.execute("INSERT OR IGNORE INTO config(chave, valor) VALUES('sal_pessoa', ?)", (secrets.token_hex(16),))
+    return _db.execute("SELECT valor FROM config WHERE chave='sal_pessoa'").fetchone()[0]
+
+
 def _limpar(dia):
     """Uma vez por dia: apaga visitas antigas e esquece os controles do dia anterior."""
     global _ultima_limpeza
@@ -117,6 +152,8 @@ def _limpar(dia):
     _ultima_limpeza = dia
     limite = (agora() - timedelta(days=DIAS_GUARDADOS)).strftime("%Y-%m-%d")
     _db.execute("DELETE FROM hits WHERE dia < ?", (limite,))
+    limite_ip = (agora() - timedelta(days=DIAS_IP)).strftime("%Y-%m-%d")
+    _db.execute("UPDATE hits SET ip='' WHERE dia < ? AND ip <> ''", (limite_ip,))
     _db.execute("DELETE FROM sessoes WHERE expira < ?", (int(time.time()),))
     for k in [k for k in _vistos if k[0] != dia]:
         del _vistos[k]
@@ -231,6 +268,40 @@ def pais_do_fuso(fuso):
 
 
 # ------------------------------------------------------------------ registro e totais
+def _txt(v, n):
+    return re.sub(r"[\x00-\x1f\x7f]", " ", str(v or "")).strip()[:n]
+
+
+def _medida(w, h):
+    try:
+        w, h = int(w or 0), int(h or 0)
+    except (TypeError, ValueError):
+        return ""
+    return f"{w}x{h}" if 0 < w < 20000 and 0 < h < 20000 else ""
+
+
+def versao_navegador(ua, nav):
+    padroes = {"Edge": r"Edg(?:A|iOS)?/(\d+)", "Opera": r"OPR/(\d+)", "Samsung Internet": r"SamsungBrowser/(\d+)",
+               "Firefox": r"(?:Firefox|FxiOS)/(\d+)", "Chrome": r"(?:Chrome|CriOS)/(\d+)", "Safari": r"Version/(\d+(?:\.\d)?)"}
+    m = re.search(padroes.get(nav, r"$^"), ua or "")
+    return f"{nav} {m.group(1)}" if m else nav
+
+
+def registrar_tempo(dados):
+    """Soma o tempo em que a página ficou visível (enviado quando o visitante sai ou troca de aba)."""
+    pv = _txt(dados.get("v"), 24)
+    try:
+        seg = int(dados.get("s") or 0)
+    except (TypeError, ValueError):
+        return False
+    if not pv or not 0 < seg <= 4 * 3600:
+        return False
+    with _lock:
+        _db.execute("UPDATE hits SET duracao = MIN(COALESCE(duracao, 0) + ?, 14400) WHERE pv = ? AND ts > ?",
+                    (seg, pv, int(time.time()) - 86400))
+    return True
+
+
 def registrar(dados, ip, ua, pais_cf=""):
     """Grava uma visita. Devolve False quando ela é ignorada (robô ou excesso)."""
     if eh_robo(ua):
@@ -240,6 +311,10 @@ def registrar(dados, ip, ua, pais_cf=""):
     with _lock:
         _limpar(dia)
         visitante = hmac.new(_sal(dia).encode(), f"{ip}|{ua}".encode(), hashlib.sha256).hexdigest()[:16]
+        # o código do navegador (guardado no próprio navegador) reconhece a pessoa mesmo trocando de rede
+        cid = _txt(dados.get("cid"), 40)
+        base = f"cid|{cid}" if re.fullmatch(r"[A-Za-z0-9-]{16,40}", cid) else f"{ip}|{ua}"
+        pessoa = hmac.new(_sal_fixo().encode(), base.encode(), hashlib.sha256).hexdigest()[:16]
         chave_hora = (momento.strftime("%Y-%m-%d %H"), visitante)
         if len(_contagem) > 50000:
             _contagem.clear()
@@ -261,18 +336,82 @@ def registrar(dados, ip, ua, pais_cf=""):
         pais = (pais_cf or "").upper()
         if not re.fullmatch(r"[A-Z]{2}", pais) or pais in ("XX", "T1"):
             pais = pais_do_fuso(dados.get("tz")) or "??"
+        utm = " / ".join(v for v in (_txt(dados.get(k), 60) for k in ("us", "um", "uc")) if v)
         _db.execute(
-            "INSERT INTO hits(ts, dia, hora, visitante, nova, pagina, origem, tipo_origem, aparelho, navegador, sistema, pais)"
-            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO hits(ts, dia, hora, visitante, nova, pagina, origem, tipo_origem, aparelho, navegador, sistema, pais,"
+            " ip, pessoa, pv, ua, versao, idioma, fuso, tela, janela, conexao, ref_url, campanha, busca)"
+            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (int(time.time()), dia, momento.hour, visitante, nova, limpar_pagina(dados.get("p")),
-             origem, tipo, aparelho, nav, so, pais))
+             origem, tipo, aparelho, nav, so, pais, str(ip)[:64], pessoa, _txt(dados.get("v"), 24), ua[:400],
+             versao_navegador(ua, nav), _txt(dados.get("lang"), 40), _txt(dados.get("tz"), 40),
+             _medida(dados.get("w"), dados.get("h")), _medida(dados.get("vw"), dados.get("vh")),
+             _txt(dados.get("c"), 10), _txt(dados.get("r"), 300), utm, _txt(dados.get("q"), 120)))
     return True
 
 
-def _top(campo, desde, limite=10, contar="COUNT(*)"):
-    rows = _db.execute(f"SELECT {campo}, {contar} AS n FROM hits WHERE dia >= ? GROUP BY {campo} HAVING n > 0 "
+def _top(campo, desde, limite=10, contar="COUNT(*)", filtro="1"):
+    rows = _db.execute(f"SELECT {campo}, {contar} AS n FROM hits WHERE dia >= ? AND {filtro} GROUP BY {campo} HAVING n > 0 "
                        f"ORDER BY n DESC, {campo} LIMIT ?", (desde, limite)).fetchall()
     return [{"nome": r[0], "n": r[1]} for r in rows]
+
+
+CAMPOS_LINHA = ("ts, pessoa, ip, pagina, busca, origem, ref_url, campanha, aparelho, versao, sistema, pais, idioma, "
+                "fuso, tela, janela, conexao, duracao, ua")
+
+
+def _hora(ts):
+    return datetime.fromtimestamp(ts, TZ).isoformat(timespec="seconds")
+
+
+def _linha(r):
+    d = dict(zip([c.strip() for c in CAMPOS_LINHA.split(",")], r))
+    d["quando"] = _hora(d.pop("ts"))
+    return d
+
+
+def visitante(pessoa, dias=90):
+    """Tudo o que se sabe de um visitante: resumo, abas preferidas, buscas e histórico de visitas."""
+    dias = max(1, min(int(dias), DIAS_GUARDADOS))
+    desde = (agora().date() - timedelta(days=dias - 1)).isoformat()
+    with _lock:
+        q = _db.execute
+        resumo = q("SELECT COUNT(*), COUNT(DISTINCT dia), MIN(ts), MAX(ts), AVG(duracao), SUM(duracao) FROM hits "
+                   "WHERE pessoa = ?", (pessoa,)).fetchone()
+        if not resumo[0]:
+            return None
+        ips = [{"nome": r[0], "n": r[1]} for r in q(
+            "SELECT ip, COUNT(*) AS n FROM hits WHERE pessoa = ? AND ip <> '' GROUP BY ip ORDER BY n DESC LIMIT 10",
+            (pessoa,))]
+        def top(campo, filtro="1"):
+            return [{"nome": r[0], "n": r[1]} for r in q(
+                f"SELECT {campo}, COUNT(*) AS n FROM hits WHERE pessoa = ? AND dia >= ? AND {filtro} "
+                f"GROUP BY {campo} ORDER BY n DESC LIMIT 15", (pessoa, desde))]
+        por_dia = [{"dia": r[0], "n": r[1]} for r in q(
+            "SELECT dia, COUNT(*) FROM hits WHERE pessoa = ? AND dia >= ? GROUP BY dia ORDER BY dia", (pessoa, desde))]
+        historico = [_linha(r) for r in q(
+            f"SELECT {CAMPOS_LINHA} FROM hits WHERE pessoa = ? ORDER BY ts DESC, id DESC LIMIT 300", (pessoa,))]
+    return {
+        "pessoa": pessoa, "dias": dias,
+        "visitas": resumo[0], "dias_com_visita": resumo[1], "primeira": _hora(resumo[2]), "ultima": _hora(resumo[3]),
+        "tempo_medio": round(resumo[4]) if resumo[4] else None, "tempo_total": resumo[5] or 0,
+        "ips": ips, "paginas": top("pagina"), "buscas": top("busca", "busca <> ''"), "origens": top("origem"),
+        "aparelhos": top("versao || ' · ' || sistema || ' · ' || aparelho"), "por_dia": por_dia, "historico": historico,
+    }
+
+
+def exportar_csv(dias=30):
+    import csv
+    import io
+    dias = max(1, min(int(dias), DIAS_GUARDADOS))
+    desde = (agora().date() - timedelta(days=dias - 1)).isoformat()
+    campos = [c.strip() for c in CAMPOS_LINHA.split(",")]
+    out = io.StringIO()
+    w = csv.writer(out, delimiter=";")
+    w.writerow(["quando"] + campos[1:])
+    with _lock:
+        for r in _db.execute(f"SELECT {CAMPOS_LINHA} FROM hits WHERE dia >= ? ORDER BY ts", (desde,)):
+            w.writerow([_hora(r[0])] + ["" if v is None else v for v in r[1:]])
+    return ("\ufeff" + out.getvalue()).encode("utf-8")  # com BOM: o Excel abre com acentos certos
 
 
 def totais(dias=30):
@@ -296,6 +435,39 @@ def totais(dias=30):
         total_desde = q("SELECT COUNT(*), COALESCE(SUM(nova), 0) FROM hits WHERE dia >= ?", (desde,)).fetchone()
         primeira = q("SELECT MIN(dia) FROM hits").fetchone()[0]
         visitantes = "SUM(nova)"  # visitantes-dia: cada pessoa conta uma vez por dia
+        # recorrência: quem já tinha vindo antes do período x quem veio pela primeira vez
+        pessoas = q("""
+            SELECT p.pessoa, p.dias, p.visitas, f.primeira
+            FROM (SELECT pessoa, COUNT(DISTINCT dia) AS dias, COUNT(*) AS visitas FROM hits
+                  WHERE dia >= ? AND pessoa <> '' GROUP BY pessoa) p
+            JOIN (SELECT pessoa, MIN(dia) AS primeira FROM hits WHERE pessoa <> '' GROUP BY pessoa) f
+              ON f.pessoa = p.pessoa""", (desde,)).fetchall()
+        novos = sum(1 for r in pessoas if r[3] >= desde)
+        voltaram = sum(1 for r in pessoas if r[1] > 1)
+        frequencia = {"1 dia": 0, "2 a 3 dias": 0, "4 a 7 dias": 0, "8 dias ou mais": 0}
+        for r in pessoas:
+            frequencia["1 dia" if r[1] == 1 else "2 a 3 dias" if r[1] <= 3 else "4 a 7 dias" if r[1] <= 7 else "8 dias ou mais"] += 1
+        frequentes = [dict(zip(("pessoa", "dias", "visitas", "primeira", "ultima", "ip", "aparelho", "navegador",
+                                "sistema", "pais", "total_dias"), r)) for r in q("""
+            SELECT p.pessoa, p.dias, p.visitas, f.primeira, p.ultima,
+                   (SELECT ip FROM hits h WHERE h.pessoa = p.pessoa ORDER BY ts DESC, id DESC LIMIT 1),
+                   (SELECT aparelho FROM hits h WHERE h.pessoa = p.pessoa ORDER BY ts DESC, id DESC LIMIT 1),
+                   (SELECT navegador FROM hits h WHERE h.pessoa = p.pessoa ORDER BY ts DESC, id DESC LIMIT 1),
+                   (SELECT sistema FROM hits h WHERE h.pessoa = p.pessoa ORDER BY ts DESC, id DESC LIMIT 1),
+                   (SELECT pais FROM hits h WHERE h.pessoa = p.pessoa ORDER BY ts DESC, id DESC LIMIT 1),
+                   f.total_dias
+            FROM (SELECT pessoa, COUNT(DISTINCT dia) AS dias, COUNT(*) AS visitas, MAX(ts) AS ultima FROM hits
+                  WHERE dia >= ? AND pessoa <> '' GROUP BY pessoa) p
+            JOIN (SELECT pessoa, MIN(dia) AS primeira, COUNT(DISTINCT dia) AS total_dias FROM hits
+                  WHERE pessoa <> '' GROUP BY pessoa) f ON f.pessoa = p.pessoa
+            ORDER BY p.dias DESC, p.visitas DESC, p.ultima DESC LIMIT 50""", (desde,))]
+        for f in frequentes:
+            f["ultima"] = _hora(f["ultima"])
+            f["top_paginas"] = [{"nome": r[0], "n": r[1]} for r in q(
+                "SELECT pagina, COUNT(*) AS n FROM hits WHERE pessoa = ? AND dia >= ? GROUP BY pagina "
+                "ORDER BY n DESC, pagina LIMIT 3", (f["pessoa"], desde))]
+        tempo = q("SELECT AVG(duracao), COUNT(duracao) FROM hits WHERE dia >= ? AND duracao > 0", (desde,)).fetchone()
+        ultimas = [_linha(r) for r in q(f"SELECT {CAMPOS_LINHA} FROM hits ORDER BY ts DESC, id DESC LIMIT 100")]
         return {
             "gerado_em": agora().isoformat(timespec="seconds"),
             "dias": dias,
@@ -314,6 +486,18 @@ def totais(dias=30):
             "navegadores": _top("navegador", desde, 8, visitantes),
             "sistemas": _top("sistema", desde, 8, visitantes),
             "paises": _top("pais", desde, 12, visitantes),
+            "recorrencia": {"pessoas": len(pessoas), "novos": novos, "recorrentes": len(pessoas) - novos,
+                            "voltaram_no_periodo": voltaram,
+                            "frequencia": [{"nome": k, "n": v} for k, v in frequencia.items() if v]},
+            "frequentes": frequentes,
+            "tempo_medio": round(tempo[0]) if tempo[0] else None,
+            "buscas": _top("busca", desde, 15, "COUNT(*)", "busca <> ''"),
+            "campanhas": _top("campanha", desde, 10, visitantes, "campanha <> ''"),
+            "idiomas": _top("idioma", desde, 8, visitantes, "idioma <> ''"),
+            "telas": _top("tela", desde, 8, visitantes, "tela <> ''"),
+            "versoes": _top("versao", desde, 10, visitantes, "versao <> ''"),
+            "ultimas": ultimas,
+            "dias_ip": DIAS_IP,
         }
 
 
@@ -454,15 +638,21 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         if url.path in ("/saude", "/"):
             return self._resposta(200, b"ok", "text/plain; charset=utf-8")
-        if url.path == "/stats":
+        if url.path in ("/stats", "/visitante", "/exportar"):
             if not self._origem_ok():
                 return self._resposta(403, {"erro": "origem não permitida"})
             if not sessao_valida(self._token()):
                 return self._resposta(401, {"erro": "entre com usuário e senha"})
+            qs = parse_qs(url.query)
             try:
-                dias = int(parse_qs(url.query).get("dias", ["30"])[0])
+                dias = int(qs.get("dias", ["30"])[0])
             except ValueError:
                 dias = 30
+            if url.path == "/visitante":
+                v = visitante(qs.get("id", [""])[0][:32], dias)
+                return self._resposta(200, v) if v else self._resposta(404, {"erro": "visitante não encontrado"})
+            if url.path == "/exportar":
+                return self._resposta(200, exportar_csv(dias), "text/csv; charset=utf-8")
             return self._resposta(200, totais(dias))
         self._resposta(404, {"erro": "não encontrado"})
 
@@ -496,7 +686,10 @@ class Handler(BaseHTTPRequestHandler):
             if not token:
                 return self._resposta(401, {"erro": erro})
             return self._resposta(200, {"token": token, "usuario": USUARIO, "dias": SESSAO_DIAS})
-        registrar(dados, self._ip(), self.headers.get("User-Agent", "")[:400], self.headers.get("CF-IPCountry", ""))
+        if dados.get("t") == "fim":
+            registrar_tempo(dados)
+        else:
+            registrar(dados, self._ip(), self.headers.get("User-Agent", "")[:400], self.headers.get("CF-IPCountry", ""))
         self._resposta(204)
 
 

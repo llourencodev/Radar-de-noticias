@@ -87,17 +87,12 @@ def export(out_dir: Path) -> dict:
     html = html.replace('href="/static/styles.css"', 'href="styles.css"')
     scripts = '<script src="static-api.js"></script>\n<script src="app.js"></script>'
     csp = CSP
-    gc = _goatcounter_code()
     own = _contador_url()
-    if gc or own:
+    if own:
         shutil.copy2(config.WEB_DIR / "contador.js", out_dir / "contador.js")
-        attrs = (f' data-contador-url="{own}"' if own else "") + (f' data-goatcounter-code="{gc}"' if gc else "")
         # antes do app.js: a interface lê o endereço do contador nesta tag para mostrar o login
-        scripts = f'<script src="contador.js"{attrs}></script>\n' + scripts
-        connect = (f" {own}" if own else "") + (f" https://{gc}.goatcounter.com" if gc else "")
-        csp = csp.replace("connect-src 'self'", f"connect-src 'self'{connect}")
-        if gc:
-            csp = csp.replace("script-src 'self'", "script-src 'self' https://gc.zgo.at")
+        scripts = f'<script src="contador.js" data-contador-url="{own}"></script>\n' + scripts
+        csp = csp.replace("connect-src 'self'", f"connect-src 'self' {own}")
     html = html.replace('<script src="/static/app.js"></script>', scripts)
     html = html.replace('<meta charset="utf-8">',
                         f'<meta charset="utf-8">\n  <meta http-equiv="Content-Security-Policy" content="{csp}">\n'
@@ -136,18 +131,6 @@ def export(out_dir: Path) -> dict:
     _write(out_dir / "data" / "eventos.json", ev)
     _write(out_dir / "data" / "status.json", {"generated_at": generated})
     return {"articles": len(articles), "events": len(ev["events"]), "generated_at": generated}
-
-
-def _goatcounter_code() -> str:
-    """Código do site no GoatCounter (a parte antes de .goatcounter.com). Vazio = contador desligado."""
-    code = os.environ.get("GOATCOUNTER_CODE", "").strip().lower()
-    if code.startswith("https://"):  # aceita também o endereço completo colado por engano
-        code = code[8:].split(".goatcounter.com")[0]
-    code = code.removesuffix(".goatcounter.com")
-    if code and not re.fullmatch(r"[a-z0-9-]{2,50}", code):
-        print(f"GOATCOUNTER_CODE inválido ({code!r}); contador de acessos desligado")
-        return ""
-    return code
 
 
 def _contador_url() -> str:
