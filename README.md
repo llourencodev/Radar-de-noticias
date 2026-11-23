@@ -102,8 +102,6 @@ IA opcional, sem expor a chave: em **Settings › Secrets and variables › Acti
 
 **Contador próprio (no seu servidor):** a pasta `contador/` tem um serviço pequeno que roda num servidor Ubuntu e guarda as visitas num SQLite. Os números aparecem na aba **Acessos** do Radar, que só aparece para quem entra com usuário e senha (link **Entrar** no menu lateral). Sem cookies e sem guardar IP. Passo a passo em [contador/LEIA-ME.md](contador/LEIA-ME.md); depois de instalar, crie no GitHub a variável `CONTADOR_URL` com o endereço do contador.
 
-**GoatCounter (reserva):** o site também conta com o [GoatCounter](https://www.goatcounter.com), conta `leandro` (painel em https://leandro.goatcounter.com). Os dois funcionam juntos; para desligar o GoatCounter, troque o valor padrão `'leandro'` em `.github/workflows/radar.yml` por `''` (ou crie a variável `GOATCOUNTER_CODE` com outro código).
-
 Só são contados acessos a partir da ativação: o GitHub Pages não guarda registro de visitas. A versão local (`iniciar.bat`) não envia nada.
 
 Para gerar o site localmente sem coletar: `.venv\Scripts\python.exe gerar_site.py --sem-coleta` (resultado em `site/`).
@@ -122,7 +120,7 @@ app/db.py                SQLite, busca FTS5, consultas
 app/scheduler.py         ciclo de coleta, histórico, falhas
 app/collectors/          rss.py, html.py, search.py (Google/Bing Notícias)
 app/processing/          classificação, status legal, duplicidade, resumo, leitura de página, IA opcional
-web/                     interface (HTML, CSS e JavaScript, sem build); static-api.js atende a versão online; contador.js conta os acessos (contador próprio e GoatCounter)
+web/                     interface (HTML, CSS e JavaScript, sem build); static-api.js atende a versão online; contador.js envia os acessos ao contador próprio
 data/radar.db            banco SQLite (criado na 1ª execução)
 contador/                contador de acessos próprio (servidor Ubuntu), ver contador/LEIA-ME.md
 tests/                   testes: .venv\Scripts\python.exe -m unittest discover tests
