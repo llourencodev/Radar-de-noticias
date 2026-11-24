@@ -7,7 +7,9 @@
 # Também liga: atualizações automáticas de segurança, firewall (ufw, liberando o SSH) e backup diário
 # dos bancos (de preferência no HD). Pode rodar de novo quando quiser: ele só ajusta o que faltar.
 # Detalhes e comandos úteis: servidor/LEIA-ME.md
-set -euo pipefail
+set -Eeuo pipefail
+# se algum comando falhar, mostra qual foi (em vez de sair calado)
+trap 'printf "\n\033[1;31m    ✘ Parou na linha %s: %s\033[0m\n    Mande um print desta tela.\n" "$LINENO" "$BASH_COMMAND"' ERR
 
 DOMINIO="${DOMINIO:-datavexsolucoes.com.br}"
 HOST_RADAR="${HOST_RADAR:-radar.$DOMINIO}"
@@ -58,7 +60,8 @@ ok "Atualizações de segurança diárias; reinício automático às 4h só quan
 
 # ---------------------------------------------------------------------------------------------
 passo "3/8 Firewall (ufw)"
-PORTA_SSH="$(sshd -T 2>/dev/null | awk '/^port /{print $2; exit}')"
+# no Ubuntu 24.04 o SSH sobe sob demanda e "sshd -T" falha; nesse caso vale a porta padrão 22
+PORTA_SSH="$( (sshd -T 2>/dev/null || true) | awk '/^port /{print $2; exit}')"
 PORTA_SSH="${PORTA_SSH:-22}"
 ufw default deny incoming >/dev/null
 ufw default allow outgoing >/dev/null
@@ -244,10 +247,10 @@ id_do_tunel() {  # a lista do cloudflared já deixa de fora os túneis apagados
 import json, sys
 print(next((t["id"] for t in json.load(sys.stdin) or [] if t["name"] == sys.argv[1]), ""))' "$TUNEL"
 }
-ID="$(id_do_tunel)"
+ID="$(id_do_tunel || true)"
 if [ -z "$ID" ]; then
   cloudflared tunnel create "$TUNEL" >/dev/null
-  ID="$(id_do_tunel)"
+  ID="$(id_do_tunel || true)"
 fi
 [ -n "$ID" ] || erro "Não consegui criar o túnel na Cloudflare. Veja a mensagem acima."
 install -d -m 755 /etc/cloudflared
@@ -295,7 +298,8 @@ else
   if [ -n "${BACKUP_DIR:-}" ]; then
     DESTINO="$BACKUP_DIR"
   else
-    DISCO_RAIZ="$(lsblk -no PKNAME "$(findmnt -no SOURCE /)" 2>/dev/null | head -1)"
+    # disco físico onde está o sistema (funciona também com LVM, padrão do Ubuntu Server)
+    DISCO_RAIZ="$( (lsblk -srno NAME,TYPE "$(findmnt -no SOURCE /)" 2>/dev/null || true) | awk '$2=="disk"{print $1; exit}')"
     # outra unidade (o HD) já montada?
     mapfile -t MONTADOS < <(lsblk -rno NAME,PKNAME,TYPE,MOUNTPOINT | awk -v r="$DISCO_RAIZ" \
       '$3=="part" && $2!=r && $2!="" && $4!="" && $4!="/" && $4!~/^\/boot/ && $4!="[SWAP]" {print $4}')
