@@ -84,6 +84,12 @@ ANTHROPIC_API_KEY=sua-chave
 
 A IA passa a gerar o resumo em português (inclusive de fontes em inglês), os pontos principais e os impactos para empresas e ERP das notícias novas. Ela também processa as notícias dos últimos 7 dias. `LLM_MAX_PER_RUN` limita o custo por coleta.
 
+## No seu servidor Ubuntu (domínio próprio)
+
+Para rodar tudo num servidor próprio, publicado em `radar.seudominio` pela Cloudflare, com firewall,
+atualizações automáticas e backup diário: `sudo bash servidor/instalar.sh`. Passo a passo em
+[servidor/LEIA-ME.md](servidor/LEIA-ME.md).
+
 ## Versão online gratuita (GitHub Pages)
 
 O Radar também roda sem o seu PC ligado, de graça, no GitHub:
@@ -111,7 +117,8 @@ Para gerar o site localmente sem coletar: `.venv\Scripts\python.exe gerar_site.p
 ```
 iniciar.bat              inicia tudo (cria o ambiente na 1ª vez)
 run.py                   servidor web + agendador
-gerar_site.py            coleta + site estático (GitHub Actions/Pages)
+gerar_site.py            coleta + site estático (GitHub Actions/Pages ou servidor)
+servidor/                instalação no servidor Ubuntu com domínio próprio
 .github/workflows/       agendamento da coleta e publicação no GitHub Pages
 verificar_fontes.py      teste rápido de todas as fontes
 config/                  sources.json, categories.json, glossary.json
