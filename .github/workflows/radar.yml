@@ -16,7 +16,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Quando o Radar passa a rodar no servidor próprio (variável SITE_URL, ver servidor/LEIA-ME.md),
+  # o GitHub para de coletar e o endereço antigo só leva o visitante ao novo.
   coletar:
+    if: vars.SITE_URL == ''
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -67,8 +70,41 @@ jobs:
         with:
           path: site
 
+  redirecionar:
+    if: vars.SITE_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      SITE_URL: ${{ vars.SITE_URL }}
+    steps:
+      - name: Gerar página que leva ao novo endereço
+        run: |
+          url="${SITE_URL%/}"
+          [[ "$url" =~ ^https://[a-z0-9.-]+\.[a-z]{2,}$ ]] || { echo "SITE_URL inválido: use só https://endereco, sem caminho"; exit 1; }
+          mkdir -p site
+          cat > site/index.html <<HTML
+          <!doctype html>
+          <html lang="pt-BR"><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>Radar de Notícias mudou de endereço</title>
+          <link rel="canonical" href="$url/">
+          <meta http-equiv="refresh" content="0; url=$url/">
+          <script>location.replace("$url/" + location.search + location.hash);</script>
+          </head><body style="font-family:system-ui,sans-serif;padding:2rem">
+          <p>O Radar de Notícias mudou para <a href="$url/">$url</a>.</p>
+          </body></html>
+          HTML
+          cp site/index.html site/404.html
+          touch site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
   publicar:
-    needs: coletar
+    needs: [coletar, redirecionar]
+    if: always() && (needs.coletar.result == 'success' || needs.redirecionar.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -86,7 +122,7 @@ jobs:
   # desligue o agendamento após 60 dias sem commits. Não roda código do repositório.
   manutencao:
     needs: coletar
-    if: always()
+    if: always() && vars.SITE_URL == ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
