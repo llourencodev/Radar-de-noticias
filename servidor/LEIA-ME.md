@@ -77,6 +77,12 @@ cd ~/radar-de-noticias && git pull && sudo bash servidor/instalar.sh
 
 O script acha o `cert.pem` na sua pasta pessoal e segue sem pedir login de novo.
 
+## Estado e cidade dos visitantes
+
+Na aba **Acessos**, estado e cidade aparecem depois de ligar, na Cloudflare, **Rules › Settings ›
+Add visitor location headers** (grátis). Detalhes em `contador/LEIA-ME.md`. Depois de atualizar o código,
+reinstale o contador: `cd ~/radar-de-noticias && git pull && sudo bash contador/instalar.sh`.
+
 ## Como funciona
 
 - O código fica em `/opt/radar/codigo` e se atualiza sozinho a partir do GitHub (ramo `main`) antes de cada
