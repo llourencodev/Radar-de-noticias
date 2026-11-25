@@ -60,6 +60,23 @@ Para voltar atrás, é só apagar a variável e rodar o workflow de novo.
 Troque também a variável `CONTADOR_URL` para `https://contador.datavexsolucoes.com.br`. Opcionalmente,
 desligue o túnel antigo do Tailscale: `sudo tailscale funnel reset`.
 
+## Login da Cloudflare
+
+Se depois de clicar em **Authorize** a Cloudflare disser que o navegador **baixou o certificado**, o arquivo
+`cert.pem` está na pasta **Downloads** do computador onde você abriu o link. Leve-o para o servidor e rode de novo:
+
+```powershell
+# no Windows (PowerShell), troque usuario@IP-do-servidor pelos seus
+scp $HOME\Downloads\cert.pem usuario@IP-do-servidor:~/
+```
+
+```bash
+# no servidor
+cd ~/radar-de-noticias && git pull && sudo bash servidor/instalar.sh
+```
+
+O script acha o `cert.pem` na sua pasta pessoal e segue sem pedir login de novo.
+
 ## Como funciona
 
 - O código fica em `/opt/radar/codigo` e se atualiza sozinho a partir do GitHub (ramo `main`) antes de cada
