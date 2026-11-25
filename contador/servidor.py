@@ -31,7 +31,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 from zoneinfo import ZoneInfo
 
 HOST = os.environ.get("CONTADOR_HOST", "127.0.0.1")
@@ -94,6 +94,8 @@ COLUNAS_EXTRAS = [
     ("ref_url", "TEXT NOT NULL DEFAULT ''"),   # endereço completo de onde veio
     ("campanha", "TEXT NOT NULL DEFAULT ''"),  # utm_source / utm_medium / utm_campaign
     ("busca", "TEXT NOT NULL DEFAULT ''"),     # o que foi pesquisado no Radar
+    ("estado", "TEXT NOT NULL DEFAULT ''"),    # estado/região (cabeçalhos de localização da Cloudflare)
+    ("cidade", "TEXT NOT NULL DEFAULT ''"),
 ]
 
 _lock = threading.Lock()
@@ -302,7 +304,29 @@ def registrar_tempo(dados):
     return True
 
 
-def registrar(dados, ip, ua, pais_cf=""):
+def _cabecalho_cf(valor, limite=60):
+    """Cabeçalho de localização da Cloudflare (cf-ipcity, cf-region...): chega em UTF-8, às vezes com %XX."""
+    v = str(valor or "")
+    try:
+        v = v.encode("latin-1").decode("utf-8")  # o http.server lê os bytes como latin-1
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
+    if "%" in v:
+        v = unquote(v)
+    return _txt(v, limite)
+
+
+def localizacao_cf(headers):
+    """(estado, cidade) a partir dos cabeçalhos da Cloudflare ("Add visitor location headers").
+    No Brasil o estado fica como sigla (SP, MG...)."""
+    pais = str(headers.get("CF-IPCountry") or "").upper()
+    sigla = _cabecalho_cf(headers.get("CF-Region-Code"), 10)
+    regiao = _cabecalho_cf(headers.get("CF-Region"))
+    estado = sigla if pais == "BR" and re.fullmatch(r"[A-Z]{2}", sigla) else (regiao or sigla)
+    return estado, _cabecalho_cf(headers.get("CF-IPCity"))
+
+
+def registrar(dados, ip, ua, pais_cf="", estado="", cidade=""):
     """Grava uma visita. Devolve False quando ela é ignorada (robô ou excesso)."""
     if eh_robo(ua):
         return False
@@ -339,13 +363,14 @@ def registrar(dados, ip, ua, pais_cf=""):
         utm = " / ".join(v for v in (_txt(dados.get(k), 60) for k in ("us", "um", "uc")) if v)
         _db.execute(
             "INSERT INTO hits(ts, dia, hora, visitante, nova, pagina, origem, tipo_origem, aparelho, navegador, sistema, pais,"
-            " ip, pessoa, pv, ua, versao, idioma, fuso, tela, janela, conexao, ref_url, campanha, busca)"
-            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " ip, pessoa, pv, ua, versao, idioma, fuso, tela, janela, conexao, ref_url, campanha, busca, estado, cidade)"
+            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (int(time.time()), dia, momento.hour, visitante, nova, limpar_pagina(dados.get("p")),
              origem, tipo, aparelho, nav, so, pais, str(ip)[:64], pessoa, _txt(dados.get("v"), 24), ua[:400],
              versao_navegador(ua, nav), _txt(dados.get("lang"), 40), _txt(dados.get("tz"), 40),
              _medida(dados.get("w"), dados.get("h")), _medida(dados.get("vw"), dados.get("vh")),
-             _txt(dados.get("c"), 10), _txt(dados.get("r"), 300), utm, _txt(dados.get("q"), 120)))
+             _txt(dados.get("c"), 10), _txt(dados.get("r"), 300), utm, _txt(dados.get("q"), 120),
+             _txt(estado, 60), _txt(cidade, 60)))
     return True
 
 
@@ -355,7 +380,7 @@ def _top(campo, desde, limite=10, contar="COUNT(*)", filtro="1"):
     return [{"nome": r[0], "n": r[1]} for r in rows]
 
 
-CAMPOS_LINHA = ("ts, pessoa, ip, pagina, busca, origem, ref_url, campanha, aparelho, versao, sistema, pais, idioma, "
+CAMPOS_LINHA = ("ts, pessoa, ip, pagina, busca, origem, ref_url, campanha, aparelho, versao, sistema, pais, estado, cidade, idioma, "
                 "fuso, tela, janela, conexao, duracao, ua")
 
 
@@ -394,7 +419,7 @@ def visitante(pessoa, dias=90):
         "pessoa": pessoa, "dias": dias,
         "visitas": resumo[0], "dias_com_visita": resumo[1], "primeira": _hora(resumo[2]), "ultima": _hora(resumo[3]),
         "tempo_medio": round(resumo[4]) if resumo[4] else None, "tempo_total": resumo[5] or 0,
-        "ips": ips, "paginas": top("pagina"), "buscas": top("busca", "busca <> ''"), "origens": top("origem"),
+        "ips": ips, "locais": top("cidade || ' · ' || estado", "cidade <> ''"), "paginas": top("pagina"), "buscas": top("busca", "busca <> ''"), "origens": top("origem"),
         "aparelhos": top("versao || ' · ' || sistema || ' · ' || aparelho"), "por_dia": por_dia, "historico": historico,
     }
 
@@ -448,13 +473,15 @@ def totais(dias=30):
         for r in pessoas:
             frequencia["1 dia" if r[1] == 1 else "2 a 3 dias" if r[1] <= 3 else "4 a 7 dias" if r[1] <= 7 else "8 dias ou mais"] += 1
         frequentes = [dict(zip(("pessoa", "dias", "visitas", "primeira", "ultima", "ip", "aparelho", "navegador",
-                                "sistema", "pais", "total_dias"), r)) for r in q("""
+                                "sistema", "pais", "estado", "cidade", "total_dias"), r)) for r in q("""
             SELECT p.pessoa, p.dias, p.visitas, f.primeira, p.ultima,
                    (SELECT ip FROM hits h WHERE h.pessoa = p.pessoa ORDER BY ts DESC, id DESC LIMIT 1),
                    (SELECT aparelho FROM hits h WHERE h.pessoa = p.pessoa ORDER BY ts DESC, id DESC LIMIT 1),
                    (SELECT navegador FROM hits h WHERE h.pessoa = p.pessoa ORDER BY ts DESC, id DESC LIMIT 1),
                    (SELECT sistema FROM hits h WHERE h.pessoa = p.pessoa ORDER BY ts DESC, id DESC LIMIT 1),
                    (SELECT pais FROM hits h WHERE h.pessoa = p.pessoa ORDER BY ts DESC, id DESC LIMIT 1),
+                   (SELECT estado FROM hits h WHERE h.pessoa = p.pessoa ORDER BY ts DESC, id DESC LIMIT 1),
+                   (SELECT cidade FROM hits h WHERE h.pessoa = p.pessoa ORDER BY ts DESC, id DESC LIMIT 1),
                    f.total_dias
             FROM (SELECT pessoa, COUNT(DISTINCT dia) AS dias, COUNT(*) AS visitas, MAX(ts) AS ultima FROM hits
                   WHERE dia >= ? AND pessoa <> '' GROUP BY pessoa) p
@@ -486,6 +513,8 @@ def totais(dias=30):
             "navegadores": _top("navegador", desde, 8, visitantes),
             "sistemas": _top("sistema", desde, 8, visitantes),
             "paises": _top("pais", desde, 12, visitantes),
+            "estados": _top("estado", desde, 15, visitantes, "estado <> ''"),
+            "cidades": _top("cidade || ' · ' || estado", desde, 15, visitantes, "cidade <> ''"),
             "recorrencia": {"pessoas": len(pessoas), "novos": novos, "recorrentes": len(pessoas) - novos,
                             "voltaram_no_periodo": voltaram,
                             "frequencia": [{"nome": k, "n": v} for k, v in frequencia.items() if v]},
@@ -689,7 +718,9 @@ class Handler(BaseHTTPRequestHandler):
         if dados.get("t") == "fim":
             registrar_tempo(dados)
         else:
-            registrar(dados, self._ip(), self.headers.get("User-Agent", "")[:400], self.headers.get("CF-IPCountry", ""))
+            estado, cidade = localizacao_cf(self.headers)
+            registrar(dados, self._ip(), self.headers.get("User-Agent", "")[:400], self.headers.get("CF-IPCountry", ""),
+                      estado, cidade)
         self._resposta(204)
 
 

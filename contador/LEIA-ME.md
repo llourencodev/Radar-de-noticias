@@ -46,7 +46,10 @@ O domínio precisa estar na Cloudflare (plano grátis).
 3. Em **Public hostname**: subdomínio `contador`, seu domínio, tipo **HTTP**, URL `localhost:8787`. Salve.
 4. Teste no navegador: `https://contador.seudominio.com.br/saude` deve mostrar `ok`.
 
-Com a Cloudflare, o painel também mostra o país exato de cada visita.
+Com a Cloudflare, o painel também mostra o país exato de cada visita. Para ver também **estado e cidade**:
+no painel da Cloudflare, abra o domínio › **Rules › Settings** (em algumas contas: **Rules › Overview › Managed Transforms**)
+e ligue **Add visitor location headers** (grátis). As visitas a partir daí passam a ter cidade e estado
+(aproximados, estimados pelo IP; as anteriores ficam só com o país).
 
 ### Opção B: Tailscale Funnel (sem domínio, grátis)
 
@@ -79,7 +82,7 @@ Depois do login, a aba **Acessos** aparece no menu daquele navegador por 30 dias
 O painel mostra: visitantes agora, hoje, ontem e no período (hoje, 7, 30, 90 dias, 1 ano); visitantes por dia
 (ou páginas por hora, hoje); recorrência (novos, recorrentes, quantos dias cada pessoa veio); visitantes frequentes
 com IP e as abas que mais acessam (clique para ver o histórico completo); últimas visitas; abas mais abertas;
-buscas feitas; de onde vieram; campanhas; aparelho, país, navegador e versão, sistema, idioma e tela.
+buscas feitas; de onde vieram; campanhas; aparelho, país, estado, cidade, navegador e versão, sistema, idioma e tela.
 
 ## Comandos úteis
 

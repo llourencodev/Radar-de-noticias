@@ -89,6 +89,22 @@ class ContadorTest(unittest.TestCase):
         self.assertEqual(st["recorrencia"]["pessoas"], 2)
         self.assertEqual(st["agora"], 2)
 
+    def test_cidade_e_estado_da_cloudflare(self):
+        utf8 = lambda t: t.encode("utf-8").decode("latin-1")  # a Cloudflare manda os bytes em UTF-8
+        self.pedir("/hit", {"p": "#/", "u": ORIGEM + "/", "tz": "America/Sao_Paulo"},
+                   headers={"CF-Connecting-IP": "200.9.9.9", "CF-IPCountry": "BR", "CF-IPCity": utf8("São José dos Campos"),
+                            "CF-Region": utf8("São Paulo"), "CF-Region-Code": "SP"})
+        self.pedir("/hit", {"p": "#/", "u": ORIGEM + "/", "tz": "Europe/Lisbon"},
+                   headers={"CF-Connecting-IP": "85.1.1.1", "CF-IPCountry": "PT", "CF-IPCity": "Braga", "CF-Region": "Braga",
+                            "CF-Region-Code": "03"})
+        self.visita(ip="200.8.8.8")  # sem os cabeçalhos de localização
+        token = self.login()[1]["token"]
+        st = self.pedir("/stats?dias=7", headers={"Authorization": "Bearer " + token})[1]
+        self.assertEqual({e["nome"] for e in st["estados"]}, {"SP", "Braga"})
+        self.assertEqual({c["nome"] for c in st["cidades"]}, {"São José dos Campos · SP", "Braga · Braga"})
+        locais = {(u["cidade"], u["estado"]) for u in st["ultimas"]}
+        self.assertEqual(locais, {("São José dos Campos", "SP"), ("Braga", "Braga"), ("", "")})
+
     def test_guarda_ip_e_detalhes(self):
         self.pedir("/hit", {"p": "#/c/fiscal?q=icms", "q": "icms", "u": ORIGEM + "/", "r": "https://www.google.com/search",
                             "w": 1920, "h": 1080, "vw": 1500, "vh": 900, "lang": "pt-BR,en", "tz": "America/Sao_Paulo",

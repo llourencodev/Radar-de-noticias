@@ -649,7 +649,7 @@
         <p>Para saber quantas pessoas usam o Radar e o que é mais útil, cada página aberta é registrada num servidor próprio do responsável pelo site. Nada é vendido nem repassado a terceiros, e não há cookies de publicidade.</p>
         <h3>O que é registrado</h3>
         <ul>
-          <li>Endereço IP, data e hora da visita.</li>
+          <li>Endereço IP, data e hora da visita, e o país, estado e cidade aproximados (estimados pelo IP).</li>
           <li>Aba aberta (Fiscal, IA, Eventos...) e o texto pesquisado na busca do Radar.</li>
           <li>Site de onde você veio e, se houver, a campanha do link.</li>
           <li>Navegador, sistema, tipo de aparelho, tamanho da tela e da janela, idioma, fuso horário e tipo de conexão.</li>
@@ -704,6 +704,13 @@
   const ACC_PERIODS = [["1", "Hoje"], ["7", "7 dias"], ["30", "30 dias"], ["90", "90 dias"], ["365", "1 ano"]];
   const COUNTRY = (() => { try { return new Intl.DisplayNames(["pt-BR"], { type: "region" }); } catch { return null; } })();
   const flag = (cc) => (/^[A-Z]{2}$/.test(cc) ? String.fromCodePoint(...[...cc].map((c) => 0x1f1a5 + c.charCodeAt(0))) : "");
+  const NO_LOC = "Sem dados no período. Cidade e estado vêm da Cloudflare: ligue “Add visitor location headers” (veja contador/LEIA-ME.md).";
+  // cidade e estado (da Cloudflare); sem eles, só o país
+  const place = (v) => {
+    const loc = [v.cidade, v.estado].filter(Boolean).join(", ");
+    if (loc) return `${flag(v.pais)} ${esc(loc)}`;
+    return v.pais && v.pais !== "??" ? `${flag(v.pais)} ${esc(v.pais)}` : "—";
+  };
   function pageName(p) {
     const r = String(p || "").replace(/^#\/?/, "");
     if (!r || r === "dashboard") return "Painel";
@@ -714,12 +721,12 @@
   const dur = (sec) => (sec == null ? "—" : sec < 60 ? `${sec}s` : sec < 3600 ? `${Math.floor(sec / 60)}min ${String(sec % 60).padStart(2, "0")}s` : `${Math.floor(sec / 3600)}h ${String(Math.floor((sec % 3600) / 60)).padStart(2, "0")}min`);
   const whenFull = (iso) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
   const plural = (n, um, varios) => `${num(n)} ${Number(n) === 1 ? um : varios}`;
-  function barList(title, rows, label = (x) => esc(x), unit = "visitantes") {
+  function barList(title, rows, label = (x) => esc(x), unit = "visitantes", empty = "Sem dados no período.") {
     const max = Math.max(1, ...rows.map((r) => r.n));
     const total = rows.reduce((a, r) => a + r.n, 0) || 1;
     return `<div class="panel acc-list"><h3>${title}</h3>${rows.length ? `<ol>${rows.map((r) => `
       <li title="${esc(num(r.n))} ${unit} · ${Math.round((r.n / total) * 100)}%"><span class="acc-bar" style="width:${(r.n / max) * 100}%"></span>
-      <span class="acc-name">${label(r.nome)}</span><span class="acc-n">${num(r.n)}</span></li>`).join("")}</ol>` : `<p class="hint">Sem dados no período.</p>`}</div>`;
+      <span class="acc-name">${label(r.nome)}</span><span class="acc-n">${num(r.n)}</span></li>`).join("")}</ol>` : `<p class="hint">${empty}</p>`}</div>`;
   }
   // gráfico de colunas (uma série): visitantes por dia ou visitas por hora
   function columns(points, { label, tip }) {
@@ -740,7 +747,7 @@
         <td class="n">${num(f.dias)}</td><td class="n">${num(f.visitas)}</td><td class="n">${num(f.total_dias)}</td>
         <td>${fmtDay(f.primeira, { day: "2-digit", month: "2-digit", year: "2-digit" })}</td><td>${when(f.ultima)}</td>
         <td>${esc(f.aparelho)} · ${esc(f.navegador)} · ${esc(f.sistema)}</td>
-        <td>${f.pais === "??" ? "—" : `${flag(f.pais)} ${esc(f.pais)}`}</td>
+        <td>${place(f)}</td>
         <td class="wrap">${(f.top_paginas || []).map((p) => `${esc(pageName(p.nome))} <span class="hint">${num(p.n)}</span>`).join(", ")}</td></tr>`).join("");
     return `
       <div class="section-head acc-sub"><h2>Recorrência</h2></div>
@@ -754,7 +761,7 @@
         ${barList("Quantos dias cada pessoa veio", r.frequencia, (x) => esc(x), "pessoas")}
         <div class="panel acc-table acc-wide"><h3>Visitantes frequentes</h3>
           ${rows ? `<div class="acc-scroll"><table>
-            <thead><tr><th>IP (último)</th><th class="n" title="Dias com visita no período">Dias</th><th class="n" title="Páginas vistas no período">Páginas</th><th class="n" title="Dias com visita desde o início">Total</th><th>1ª visita</th><th>Última</th><th>Aparelho</th><th>País</th><th>Mais acessa</th></tr></thead>
+            <thead><tr><th>IP (último)</th><th class="n" title="Dias com visita no período">Dias</th><th class="n" title="Páginas vistas no período">Páginas</th><th class="n" title="Dias com visita desde o início">Total</th><th>1ª visita</th><th>Última</th><th>Aparelho</th><th>Local</th><th>Mais acessa</th></tr></thead>
             <tbody>${rows}</tbody></table></div>${moreBtn((d.frequentes || []).length, 12)}
             <p class="hint">Clique numa linha para ver tudo do visitante. A mesma pessoa é reconhecida pelo navegador, mesmo trocando de rede; outro navegador ou aparelho conta como outra pessoa.</p>`
           : `<p class="hint">Sem dados no período.</p>`}
@@ -776,7 +783,7 @@
       <td>${v.busca ? `“${esc(v.busca)}”` : ""}</td>
       <td>${v.ref_url ? `<span title="${esc(v.ref_url)}">${origem}</span>` : origem}</td>
       <td>${esc(v.versao || "")} · ${esc(v.sistema)} · ${esc(v.aparelho)}</td>
-      <td>${v.pais === "??" ? "—" : `${flag(v.pais)} ${esc(v.pais)}`}</td><td>${esc((v.idioma || "").split(",")[0])}</td>
+      <td>${place(v)}</td><td>${esc((v.idioma || "").split(",")[0])}</td>
       <td>${esc(v.tela || "")}</td><td class="n">${dur(v.duracao)}</td></tr>`;
   }
   async function openVisitor(pessoa, dias) {
@@ -799,11 +806,12 @@
         ${barList("O que pesquisou", v.buscas, (x) => esc(x), "buscas")}
         ${barList("De onde veio", v.origens, (x) => esc(x), "páginas vistas")}
         ${barList("Aparelhos e navegadores", v.aparelhos, (x) => esc(x), "páginas vistas")}
+        ${barList("Cidades", v.locais || [], (x) => esc(String(x).replace(" · ", ", ")), "páginas vistas")}
         ${barList("IPs usados", v.ips, (x) => `<span class="mono">${esc(x)}</span>`, "páginas vistas")}
       </div>
       <h4>Histórico (${num(v.historico.length)} mais recentes)</h4>
       <div class="acc-table"><div class="acc-scroll"><table>
-        <thead><tr><th>Quando</th><th>IP</th><th>Aba</th><th>Busca</th><th>De onde veio</th><th>Aparelho</th><th>País</th><th>Idioma</th><th>Tela</th><th class="n">Tempo</th></tr></thead>
+        <thead><tr><th>Quando</th><th>IP</th><th>Aba</th><th>Busca</th><th>De onde veio</th><th>Aparelho</th><th>Local</th><th>Idioma</th><th>Tela</th><th class="n">Tempo</th></tr></thead>
         <tbody>${v.historico.map(visitRow).join("")}</tbody></table></div>${moreBtn(v.historico.length, 20)}</div>
     </div>`;
     collapseTables($("#modalBody"));
@@ -859,6 +867,8 @@
         ${barList("Tipo de origem", d.tipos_origem)}
         ${barList("Aparelho", d.aparelhos)}
         ${barList("País", d.paises, (cc) => (cc === "??" ? "Não identificado" : `${flag(cc)} ${esc(COUNTRY?.of(cc) || cc)}`))}
+        ${barList("Estado", d.estados || [], undefined, undefined, NO_LOC)}
+        ${barList("Cidade", d.cidades || [], (x) => esc(String(x).replace(" · ", ", ")), undefined, NO_LOC)}
         ${barList("Navegador", d.navegadores)}
         ${barList("Sistema", d.sistemas)}
         ${barList("Versão do navegador", d.versoes || [])}
@@ -869,7 +879,7 @@
       </div>
       <div class="panel acc-table"><h3>Últimas visitas</h3>
         ${(d.ultimas || []).length ? `<div class="acc-scroll"><table>
-          <thead><tr><th>Quando</th><th>IP</th><th>Aba</th><th>Busca</th><th>De onde veio</th><th>Aparelho</th><th>País</th><th>Idioma</th><th>Tela</th><th class="n">Tempo</th></tr></thead>
+          <thead><tr><th>Quando</th><th>IP</th><th>Aba</th><th>Busca</th><th>De onde veio</th><th>Aparelho</th><th>Local</th><th>Idioma</th><th>Tela</th><th class="n">Tempo</th></tr></thead>
           <tbody>${d.ultimas.map(visitRow).join("")}</tbody></table></div>${moreBtn(d.ultimas.length, 15)}` : `<p class="hint">Nenhuma visita registrada ainda.</p>`}
       </div>`;
     collapseTables(view);
