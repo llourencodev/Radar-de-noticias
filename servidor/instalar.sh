@@ -243,12 +243,28 @@ echo 'Unattended-Upgrade::Origins-Pattern { "site=pkg.cloudflare.com"; };' > /et
 ok "cloudflared $(cloudflared --version 2>/dev/null | awk '{print $3}')"
 
 export HOME=/root
+# o certificado de login pode já estar em outro lugar: login feito sem sudo, ou baixado pelo navegador e
+# copiado para a pasta pessoal (ex.: scp cert.pem usuario@servidor:~/)
+CASA_USUARIO="$(getent passwd "${SUDO_USER:-root}" | cut -d: -f6)"
+if [ ! -f /root/.cloudflared/cert.pem ]; then
+  for c in "$CASA_USUARIO/.cloudflared/cert.pem" "$CASA_USUARIO/cert.pem"; do
+    if [ -f "$c" ]; then
+      install -d -m 700 /root/.cloudflared
+      install -m 600 "$c" /root/.cloudflared/cert.pem
+      ok "Usando o certificado da Cloudflare de $c"
+      break
+    fi
+  done
+fi
 if [ ! -f /root/.cloudflared/cert.pem ]; then
   echo
   echo "    >>> Abra o link que vai aparecer abaixo (pode ser no seu computador ou celular),"
   echo "    >>> entre na Cloudflare e clique em $DOMINIO > Authorize. Depois volte aqui."
+  echo "    >>> Se a Cloudflare disser que o navegador BAIXOU o certificado (cert.pem), aperte Ctrl+C"
+  echo "    >>> e siga \"Login da Cloudflare\" em servidor/LEIA-ME.md."
   echo
-  cloudflared tunnel login
+  cloudflared tunnel login || true
+  [ -f /root/.cloudflared/cert.pem ] || erro "O login da Cloudflare não terminou. Veja \"Login da Cloudflare\" em servidor/LEIA-ME.md."
 fi
 id_do_tunel() {  # a lista do cloudflared já deixa de fora os túneis apagados
   cloudflared tunnel list -o json 2>/dev/null | python3 -c '
