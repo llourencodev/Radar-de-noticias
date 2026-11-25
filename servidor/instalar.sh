@@ -210,13 +210,21 @@ CONF
   systemctl daemon-reload
   systemctl enable --now radar-coleta.timer >/dev/null 2>&1
   if [ ! -L /var/lib/radar/site ]; then
-    echo "    Primeira coleta: lê todas as fontes, leva uns 10 a 30 minutos. Pode acompanhar em outro"
-    echo "    terminal com: journalctl -fu radar-coleta"
-    systemctl start radar-coleta || aviso "A primeira coleta falhou. Veja: journalctl -u radar-coleta -n 80"
-  else
-    systemctl start --no-block radar-coleta
+    # até a primeira coleta terminar, o endereço mostra um aviso (em vez de erro)
+    install -d -o radar -g radar -m 755 /var/lib/radar/site-inicial
+    cat > /var/lib/radar/site-inicial/index.html <<'HTML'
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="60"><title>Radar de Notícias</title></head>
+<body style="font-family:system-ui,sans-serif;padding:2rem;max-width:40rem;margin:auto">
+<h1>Radar de Notícias</h1><p>Primeira coleta de notícias em andamento. Esta página se atualiza sozinha a cada minuto.</p>
+</body></html>
+HTML
+    ln -sfn /var/lib/radar/site-inicial /var/lib/radar/site
   fi
-  [ -L /var/lib/radar/site ] && ok "Site gerado; nova coleta a cada hora (minuto 7)"
+  # a coleta roda em segundo plano (como serviço): se a conexão SSH cair, ela continua
+  systemctl start --no-block radar-coleta
+  ok "Coleta iniciada em segundo plano (a primeira leva uns 10 a 30 minutos; depois, de hora em hora)"
+  echo "    Para acompanhar: journalctl -fu radar-coleta"
 else
   passo "5/8 Radar: fica no GitHub Pages (modo híbrido), nada a instalar aqui"
 fi
@@ -398,7 +406,11 @@ fi
 
 echo
 echo "================================================================================"
-if [ "$TUDO_OK" = 1 ]; then echo " Pronto!"; else
+if [ "$TUDO_OK" = 1 ]; then echo " Pronto!"
+  if [ "$MODO" = completo ] && [ "$(readlink /var/lib/radar/site)" = /var/lib/radar/site-inicial ]; then
+    echo " A primeira coleta ainda está rodando: em 10 a 30 minutos as notícias aparecem no site."
+  fi
+else
   echo " Instalado, mas algum link ainda não respondeu. Espere uns minutos e abra no navegador;"
   echo " se continuar fora, veja: journalctl -u cloudflared -n 50"
 fi

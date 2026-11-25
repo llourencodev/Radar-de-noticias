@@ -39,8 +39,9 @@ Durante a instalação ele pode pedir duas coisas:
 
 Se achar o HD conectado mas sem uso, ele pergunta se pode montá-lo em `/mnt/hd` para os backups (nada é apagado).
 
-A primeira coleta lê todas as fontes e leva de 10 a 30 minutos. No fim aparece **Pronto!** e o link.
-Abra `https://radar.datavexsolucoes.com.br` no navegador.
+No fim aparece **Pronto!** e o link. Abra `https://radar.datavexsolucoes.com.br` no navegador.
+A primeira coleta roda em segundo plano e leva de 10 a 30 minutos; até lá o site mostra um aviso
+(se a conexão SSH cair nesse meio-tempo, a coleta continua).
 
 > O histórico começa do zero no servidor: as notícias recentes das fontes entram na primeira coleta.
 
