@@ -103,6 +103,7 @@ reinstale o contador: `cd ~/radar-de-noticias && git pull && sudo bash contador/
 | Fazer backup agora | `sudo radar-backup` |
 | Onde estão os backups | `cat /etc/radar-backup.conf` |
 | Firewall | `sudo ufw status` |
+| Verificar a segurança (só lê, não muda nada) | `sudo bash servidor/verificar-seguranca.sh` |
 | Reinstalar/ajustar (pode rodar quantas vezes quiser) | `cd ~/radar-de-noticias && git pull && sudo bash servidor/instalar.sh` |
 
 ## Backup no HD
